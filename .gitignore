@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Jupyter / VSCode
+.ipynb_checkpoints
+.vscode/
+
+# Mac / Linux
+.DS_Store
+Thumbs.db
+
+# Project-specific
+weekly/
+reports/
+*.png
+*.xlsx
