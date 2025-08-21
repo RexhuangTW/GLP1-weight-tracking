@@ -20,9 +20,3 @@ ENV/
 # Mac / Linux
 .DS_Store
 Thumbs.db
-
-# Project-specific
-weekly/
-reports/
-*.png
-*.xlsx
