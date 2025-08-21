@@ -7,15 +7,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 
-# --- Chinese font fallback (fix garbled labels) ---
-# Try common CJK fonts; matplotlib will use the first available.
+# -------- Chinese font fallback (for charts) --------
 matplotlib.rcParams["font.sans-serif"] = [
     "Noto Sans CJK TC", "Noto Sans CJK SC", "Noto Sans CJK JP",
     "Microsoft JhengHei", "PingFang TC", "Heiti TC", "SimHei",
     "WenQuanYi Micro Hei", "Arial Unicode MS", "DejaVu Sans"
 ]
-matplotlib.rcParams["axes.unicode_minus"] = False  # ensure minus sign renders
+matplotlib.rcParams["axes.unicode_minus"] = False
 
+# -------- Column definitions --------
 REQUIRED_LOGICAL = [
     "日期",
     "早上體重 (kg)",
@@ -41,6 +41,7 @@ ALIASES = {
     "每日飲水量 (L)": ["每日飲水量 (L)", "飲水量", "水量", "water", "daily water (l)", "water_l"],
 }
 
+# -------- Helpers --------
 def norm(s: str) -> str:
     s = str(s)
     s = s.strip().lower()
@@ -100,8 +101,11 @@ def read_daily_log(master_path, sheet_name=None, header_row=0):
     df_final["日期"] = pd.to_datetime(df_final["日期"])
     return df_final
 
+def pandas_offset_weeks(n):
+    return pd.Timedelta(days=7*n)
+
 def assign_custom_week(df, anchor_date):
-    d0 = pd.to_datetime(anchor_date).normalize()
+    d0 = pd.to_datetime(anchor_date).normalize()  # Friday anchor
     delta_days = (df["日期"].dt.normalize() - d0).dt.days
     week_idx = (delta_days // 7) + 1  # 1-based
     df2 = df.copy()
@@ -110,10 +114,7 @@ def assign_custom_week(df, anchor_date):
 
 def pick_custom_week(df, anchor_date, week_index=None):
     df2 = assign_custom_week(df, anchor_date)
-    if week_index is None:
-        target = int(df2["WEEK_IDX"].max())
-    else:
-        target = int(week_index)
+    target = int(df2["WEEK_IDX"].max() if week_index is None else week_index)
     wdf = df2[df2["WEEK_IDX"] == target].copy()
     if wdf.empty:
         raise ValueError(f"在 anchor={anchor_date} 下，找不到第 {target} 週的資料。")
@@ -122,9 +123,16 @@ def pick_custom_week(df, anchor_date, week_index=None):
     tag = f"{start_date.year}-CW{target:02d}"
     return wdf, tag, start_date, end_date
 
-def pandas_offset_weeks(n):
-    # helper to move by n weeks as Timedelta
-    return pd.Timedelta(days=7*n)
+def _first_last_valid(series):
+    s = series.dropna()
+    if s.empty:
+        return None, None
+    return float(s.iloc[0]), float(s.iloc[-1])
+
+def _fmt(x, digits=1, unit=""):
+    if x is None or (isinstance(x, float) and x != x):
+        return "-"
+    return f"{x:.{digits}f}" + (f" {unit}" if unit else "")
 
 def save_weekly_excel(wdf, out_excel_path):
     base_cols = REQUIRED_LOGICAL
@@ -153,25 +161,30 @@ def make_charts(wdf, out_dir, prefix):
 
 def compute_stats(wdf):
     wdf_sorted = wdf.sort_values("日期")
+    sw_am, ew_am = _first_last_valid(wdf_sorted["早上體重 (kg)"])
+    sw_pm, ew_pm = _first_last_valid(wdf_sorted["晚上體重 (kg)"])
+    sf_am, ef_am = _first_last_valid(wdf_sorted["早上體脂 (%)"])
+    sf_pm, ef_pm = _first_last_valid(wdf_sorted["晚上體脂 (%)"])
+
     stats = {
         "period_start": wdf_sorted["日期"].iloc[0].strftime("%Y/%m/%d"),
         "period_end":   wdf_sorted["日期"].iloc[-1].strftime("%Y/%m/%d"),
-        "start_weight_am": float(wdf_sorted["早上體重 (kg)"].iloc[0]),
-        "end_weight_am":   float(wdf_sorted["早上體重 (kg)"].iloc[-1]),
-        "delta_weight_am": float(wdf_sorted["早上體重 (kg)"].iloc[-1]-wdf_sorted["早上體重 (kg)"].iloc[0]),
+        "start_weight_am": sw_am,
+        "end_weight_am":   ew_am,
+        "delta_weight_am": (ew_am - sw_am) if (sw_am is not None and ew_am is not None) else None,
         "avg_weight_am":   float(wdf_sorted["早上體重 (kg)"].mean()),
-        "start_weight_pm": float(wdf_sorted["晚上體重 (kg)"].iloc[0]),
-        "end_weight_pm":   float(wdf_sorted["晚上體重 (kg)"].iloc[-1]),
-        "delta_weight_pm": float(wdf_sorted["晚上體重 (kg)"].iloc[-1]-wdf_sorted["晚上體重 (kg)"].iloc[0]),
+        "start_weight_pm": sw_pm,
+        "end_weight_pm":   ew_pm,
+        "delta_weight_pm": (ew_pm - sw_pm) if (sw_pm is not None and ew_pm is not None) else None,
         "avg_weight_pm":   float(wdf_sorted["晚上體重 (kg)"].mean()),
         "avg_weight_all":  float(wdf_sorted[["早上體重 (kg)","晚上體重 (kg)"]].mean().mean()),
-        "start_fat_am": float(wdf_sorted["早上體脂 (%)"].iloc[0]),
-        "end_fat_am":   float(wdf_sorted["早上體脂 (%)"].iloc[-1]),
-        "delta_fat_am": float(wdf_sorted["早上體脂 (%)"].iloc[-1]-wdf_sorted["早上體脂 (%)"].iloc[0]),
+        "start_fat_am": sf_am,
+        "end_fat_am":   ef_am,
+        "delta_fat_am": (ef_am - sf_am) if (sf_am is not None and ef_am is not None) else None,
         "avg_fat_am":   float(wdf_sorted["早上體脂 (%)"].mean()),
-        "start_fat_pm": float(wdf_sorted["晚上體脂 (%)"].iloc[0]),
-        "end_fat_pm":   float(wdf_sorted["晚上體脂 (%)"].iloc[-1]),
-        "delta_fat_pm": float(wdf_sorted["晚上體脂 (%)"].iloc[-1]-wdf_sorted["晚上體脂 (%)"].iloc[0]),
+        "start_fat_pm": sf_pm,
+        "end_fat_pm":   ef_pm,
+        "delta_fat_pm": (ef_pm - sf_pm) if (sf_pm is not None and ef_pm is not None) else None,
         "avg_fat_pm":   float(wdf_sorted["晚上體脂 (%)"].mean()),
         "avg_fat_all":  float(wdf_sorted[["早上體脂 (%)","晚上體脂 (%)"]].mean().mean()),
         "days": int(wdf_sorted.shape[0])
@@ -185,37 +198,40 @@ def compute_stats(wdf):
 
 def make_markdown(wdf, stats, png_weight, png_bodyfat, out_md_path, week_tag, start_date, end_date):
     tbl = wdf[["日期","早上體重 (kg)","晚上體重 (kg)","早上體脂 (%)","晚上體脂 (%)"]].copy()
-    tbl["日期"] = tbl["日期"].dt.strftime("%m/%d (%a)")
+
+    weekday_zh = {0:"週一",1:"週二",2:"週三",3:"週四",4:"週五",5:"週六",6:"週日"}
+    tbl["日期"] = tbl["日期"].apply(lambda d: d.strftime('%m/%d') + f" ({weekday_zh[d.weekday()]})")
+
     md_table = tbl.to_markdown(index=False)
 
     extra = ""
     if stats["avg_water"] is not None:
-        extra = f"  \\n- 平均每日飲水量：{stats['avg_water']:.1f} L"
+        extra = f"  \n- 平均每日飲水量：{_fmt(stats['avg_water'])} L"
 
     md = (
-f"# 📊 減重週報（{week_tag}）\\n\\n"
-f"**週期：{start_date.strftime('%Y/%m/%d')} ～ {end_date.strftime('%Y/%m/%d')}**  \\n\\n"
-"---\\n\\n"
-"## 📈 體重與體脂紀錄\\n\\n"
-f"{md_table}\\n\\n"
-"---\\n\\n"
-"## 📊 趨勢圖\\n\\n"
-f"![體重趨勢]({os.path.basename(png_weight)})\\n"
-f"![體脂率趨勢]({os.path.basename(png_bodyfat)})\\n\\n"
-"---\\n\\n"
-"## 📌 本週統計\\n\\n"
-f"- 體重（AM）：{stats['start_weight_am']:.1f} → {stats['end_weight_am']:.1f} kg  (**{stats['delta_weight_am']:+.1f} kg**), 週平均 {stats['avg_weight_am']:.1f} kg  \\n"
-f"- 體重（PM）：{stats['start_weight_pm']:.1f} → {stats['end_weight_pm']:.1f} kg  (**{stats['delta_weight_pm']:+.1f} kg**), 週平均 {stats['avg_weight_pm']:.1f} kg  \\n"
-f"- 體重（AM+PM 平均）：{stats['avg_weight_all']:.1f} kg  \\n\\n"
-f"- 體脂（AM）：{stats['start_fat_am']:.1f}% → {stats['end_fat_am']:.1f}%  (**{stats['delta_fat_am']:+.1f}%**), 週平均 {stats['avg_fat_am']:.1f}%  \\n"
-f"- 體脂（PM）：{stats['start_fat_pm']:.1f}% → {stats['end_fat_pm']:.1f}%  (**{stats['delta_fat_pm']:+.1f}%**), 週平均 {stats['avg_fat_pm']:.1f}%  \\n"
-f"- 體脂（AM+PM 平均）：{stats['avg_fat_all']:.1f}%  \\n\\n"
-f"- 紀錄天數：{stats['days']} 天{extra}\\n\\n"
-"---\\n\\n"
-"## ✅ 建議\\n"
-"- 維持 **高蛋白 (每公斤 1.6–2.0 g)** 與 **每週 2–3 次阻力訓練**  \\n"
-"- 飲水 **≥ 3 L/天**（依活動量調整）  \\n"
-"- 若每週下降 > 2.5 kg，建議微調熱量或與醫師討論  \\n"
+        f"# 📊 減重週報（{week_tag}）\n\n"
+        f"**週期：{start_date.strftime('%Y/%m/%d')} ～ {end_date.strftime('%Y/%m/%d')}**  \n\n"
+        "---\n\n"
+        "## 📈 體重與體脂紀錄\n\n"
+        f"{md_table}\n\n"
+        "---\n\n"
+        "## 📊 趨勢圖\n\n"
+        f"![體重趨勢]({os.path.basename(png_weight)})\n"
+        f"![體脂率趨勢]({os.path.basename(png_bodyfat)})\n\n"
+        "---\n\n"
+        "## 📌 本週統計\n\n"
+        f"- 體重（AM）：{_fmt(stats['start_weight_am'])} → {_fmt(stats['end_weight_am'])} kg  (**{_fmt(stats['delta_weight_am'])} kg**), 週平均 {stats['avg_weight_am']:.1f} kg  \n"
+        f"- 體重（PM）：{_fmt(stats['start_weight_pm'])} → {_fmt(stats['end_weight_pm'])} kg  (**{_fmt(stats['delta_weight_pm'])} kg**), 週平均 {stats['avg_weight_pm']:.1f} kg  \n"
+        f"- 體重（AM+PM 平均）：{stats['avg_weight_all']:.1f} kg  \n\n"
+        f"- 體脂（AM）：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), 週平均 {stats['avg_fat_am']:.1f}%  \n"
+        f"- 體脂（PM）：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), 週平均 {stats['avg_fat_pm']:.1f}%  \n"
+        f"- 體脂（AM+PM 平均）：{stats['avg_fat_all']:.1f}%  \n\n"
+        f"- 紀錄天數：{stats['days']} 天{extra}\n\n"
+        "---\n\n"
+        "## ✅ 建議\n"
+        "- 維持 **高蛋白 (每公斤 1.6–2.0 g)** 與 **每週 2–3 次阻力訓練**  \n"
+        "- 飲水 **≥ 3 L/天**（依活動量調整）  \n"
+        "- 若每週下降 > 2.5 kg，建議微調熱量或與醫師討論  \n"
     )
     with open(out_md_path, "w", encoding="utf-8") as f:
         f.write(md)
