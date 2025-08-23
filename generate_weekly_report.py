@@ -236,6 +236,103 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, out_md_path, week_tag, st
     with open(out_md_path, "w", encoding="utf-8") as f:
         f.write(md)
 
+def make_summary_report(df, out_dir, prefix="summary"):
+    """產生從第一天到最新數據的總結報告"""
+    df_sorted = df.sort_values("日期")
+    
+    # 計算整體統計
+    stats = compute_stats(df_sorted)
+    
+    # 產生圖表
+    weight_png, bodyfat_png = make_charts(df_sorted, out_dir, prefix=prefix)
+    
+    # 計算週次
+    total_days = len(df_sorted)
+    total_weeks = (total_days + 6) // 7  # 向上取整
+    
+    # 產生表格 - 只顯示最近7天和第一天作對比
+    recent_data = df_sorted.tail(7)
+    first_day = df_sorted.iloc[0:1].copy()
+    
+    if len(df_sorted) <= 7:
+        display_data = df_sorted.copy()
+    else:
+        # 創建分隔行
+        separator_row = pd.DataFrame({
+            "日期": ["..."],
+            "早上體重 (kg)": ["..."],
+            "晚上體重 (kg)": ["..."],
+            "早上體脂 (%)": ["..."],
+            "晚上體脂 (%)": ["..."]
+        })
+        display_data = pd.concat([first_day, separator_row, recent_data], ignore_index=True)
+    
+    # 格式化日期
+    weekday_zh = {0:"週一",1:"週二",2:"週三",3:"週四",4:"週五",5:"週六",6:"週日"}
+    display_data_copy = display_data.copy()
+    
+    for idx in display_data_copy.index:
+        date_val = display_data_copy.loc[idx, "日期"]
+        if date_val != "..." and pd.notna(date_val):
+            display_data_copy.loc[idx, "日期"] = date_val.strftime('%m/%d') + f" ({weekday_zh[date_val.weekday()]})"
+    
+    md_table = display_data_copy[["日期","早上體重 (kg)","晚上體重 (kg)","早上體脂 (%)","晚上體脂 (%)"]].to_markdown(index=False)
+    
+    # 計算總體趨勢
+    start_date = df_sorted["日期"].iloc[0]
+    end_date = df_sorted["日期"].iloc[-1]
+    
+    # 額外統計
+    extra = ""
+    if stats["avg_water"] is not None:
+        extra = f"  \n- 平均每日飲水量：{_fmt(stats['avg_water'])} L"
+    
+    # 週次分析
+    weekly_analysis = ""
+    if total_weeks > 1:
+        weekly_weight_loss_am = stats['delta_weight_am'] / total_weeks if stats['delta_weight_am'] else 0
+        weekly_weight_loss_pm = stats['delta_weight_pm'] / total_weeks if stats['delta_weight_pm'] else 0
+        weekly_analysis = f"  \n- 平均每週體重變化（AM）：{_fmt(weekly_weight_loss_am)} kg/週  \n- 平均每週體重變化（PM）：{_fmt(weekly_weight_loss_pm)} kg/週"
+    
+    md = (
+        f"# 📊 減重總結報告\n\n"
+        f"**總期間：{start_date.strftime('%Y/%m/%d')} ～ {end_date.strftime('%Y/%m/%d')}**  \n"
+        f"**追蹤期間：{total_days} 天 ({total_weeks} 週)**  \n\n"
+        "---\n\n"
+        "## 📈 體重與體脂紀錄概覽\n\n"
+        "*顯示第一天與最近7天的數據*\n\n"
+        f"{md_table}\n\n"
+        "---\n\n"
+        "## 📊 整體趨勢圖\n\n"
+        f"![體重趨勢]({os.path.basename(weight_png)})\n"
+        f"![體脂率趨勢]({os.path.basename(bodyfat_png)})\n\n"
+        "---\n\n"
+        "## 📌 總體統計\n\n"
+        f"- **體重（AM）**：{_fmt(stats['start_weight_am'])} → {_fmt(stats['end_weight_am'])} kg  (**{_fmt(stats['delta_weight_am'])} kg**), 總平均 {stats['avg_weight_am']:.1f} kg  \n"
+        f"- **體重（PM）**：{_fmt(stats['start_weight_pm'])} → {_fmt(stats['end_weight_pm'])} kg  (**{_fmt(stats['delta_weight_pm'])} kg**), 總平均 {stats['avg_weight_pm']:.1f} kg  \n"
+        f"- **體重（AM+PM 平均）**：{stats['avg_weight_all']:.1f} kg  \n\n"
+        f"- **體脂（AM）**：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), 總平均 {stats['avg_fat_am']:.1f}%  \n"
+        f"- **體脂（PM）**：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), 總平均 {stats['avg_fat_pm']:.1f}%  \n"
+        f"- **體脂（AM+PM 平均）**：{stats['avg_fat_all']:.1f}%  \n\n"
+        f"- **追蹤天數**：{stats['days']} 天{extra}{weekly_analysis}\n\n"
+        "---\n\n"
+        "## 🎯 重點成果\n\n"
+    )
+    
+    # 成果分析
+    if stats['delta_weight_am'] and stats['delta_weight_am'] < 0:
+        md += f"✅ **體重減少**：在 {total_days} 天內減重 {abs(stats['delta_weight_am']):.1f} kg（早上測量）  \n"
+    if stats['delta_fat_pm'] and stats['delta_fat_pm'] < 0:
+        md += f"✅ **體脂下降**：體脂率降低 {abs(stats['delta_fat_pm']):.1f}%（晚上測量）  \n"
+    
+    md += "\n## ✅ 持續建議\n"
+    md += "- 維持 **高蛋白 (每公斤 1.6–2.0 g)** 與 **每週 2–3 次阻力訓練**  \n"
+    md += "- 飲水 **≥ 3 L/天**（依活動量調整）  \n"
+    md += "- 持續監測體重與體脂變化，建議保持每週穩定減重  \n"
+    md += "- 如有任何異常變化，建議諮詢專業醫師  \n"
+    
+    return md, weight_png, bodyfat_png
+
 def main():
     p = argparse.ArgumentParser(description="以週五為起始的自訂週期，從 master 產生 Excel + Markdown + 圖表（含中文字體修正）")
     p.add_argument("master", nargs="?", default="GLP1_weight_tracking_master.xlsx", help="主檔 Excel（手動維護）")
@@ -244,23 +341,42 @@ def main():
     p.add_argument("--anchor-date", default="2025-08-15", help="每週起始的對齊基準日（週五），例如 2025-08-15")
     p.add_argument("--week-index", type=int, default=None, help="第幾週（以 anchor-date 為第1週起算）；未提供則取最後一週")
     p.add_argument("--out-root", default=".", help="輸出根目錄（會在裡面建立 weekly/ 與 reports/）")
+    p.add_argument("--summary", action="store_true", help="產生從第一天到最新數據的總結報告")
     args = p.parse_args()
 
     df = read_daily_log(args.master, sheet_name=args.sheet, header_row=args.header_row)
+
+    if args.summary:
+        # 產生總結報告
+        reports_dir = os.path.join(args.out_root, "reports")
+        summary_dir = os.path.join(reports_dir, "summary")
+        ensure_dirs(summary_dir)
+        
+        summary_md, weight_png, bodyfat_png = make_summary_report(df, summary_dir)
+        summary_md_path = os.path.join(summary_dir, "overall_summary_report.md")
+        
+        with open(summary_md_path, "w", encoding="utf-8") as f:
+            f.write(summary_md)
+        
+        print("✅ 總結報告已完成輸出")
+        print("Summary MD :", summary_md_path)
+        print("Charts     :", weight_png, bodyfat_png)
+        return
 
     wdf, week_tag, start_date, end_date = pick_custom_week(df, args.anchor_date, args.week_index)
 
     weekly_dir = os.path.join(args.out_root, "weekly")
     reports_dir = os.path.join(args.out_root, "reports")
-    ensure_dirs(weekly_dir); ensure_dirs(reports_dir)
+    week_reports_dir = os.path.join(reports_dir, week_tag)  # 在 reports 下建立週期子資料夾
+    ensure_dirs(weekly_dir); ensure_dirs(week_reports_dir)
 
     weekly_xlsx = os.path.join(weekly_dir, f"{week_tag}_weight_tracking.xlsx")
     save_weekly_excel(wdf, weekly_xlsx)
 
-    weight_png, bodyfat_png = make_charts(wdf, reports_dir, prefix=week_tag)
+    weight_png, bodyfat_png = make_charts(wdf, week_reports_dir, prefix=week_tag)
 
     stats = compute_stats(wdf)
-    weekly_md = os.path.join(reports_dir, f"{week_tag}_weekly_report.md")
+    weekly_md = os.path.join(week_reports_dir, f"{week_tag}_weekly_report.md")
     make_markdown(wdf, stats, weight_png, bodyfat_png, weekly_md, week_tag, start_date, end_date)
 
     print("✅ 已完成輸出")
