@@ -444,6 +444,43 @@ def _compute_eta(wdf_all, wdf_slice, metric: str, target: float, scope: str = 'g
     else:
         # all history window
         win = df
+    # 特別處理：體脂率以『脂肪重量/體重』的動態來估算 ETA，而非直接回歸體脂率數列
+    if metric == 'fatpct':
+        # 目標比例（非百分比）
+        p = float(target) / 100.0
+        # 估算脂肪重量與體重的每日斜率與當前值
+        af, last_f, cur_f = _compute_slope_per_day(wdf_all, wdf_slice, metric='fatkg', scope=scope, method=method)
+        aw, last_w, cur_w = _compute_slope_per_day(wdf_all, wdf_slice, metric='weight', scope=scope, method=method)
+        if af is None or aw is None or last_f is None or last_w is None or cur_f is None or cur_w is None:
+            return None
+        # 將兩者對齊到相同的最近日期（取兩者的較早者，避免前視外推）
+        last_date = last_f if last_f <= last_w else last_w
+        df_days = (last_date - last_f).days
+        dw_days = (last_date - last_w).days
+        F0 = float(cur_f + (af * df_days))
+        W0 = float(cur_w + (aw * dw_days))
+        if W0 <= 0:
+            return None
+        # 若當前體脂率已不高於目標，則不估算
+        cur_pct = (F0 / W0) * 100.0
+        if not (cur_pct > target):
+            return None
+        # 解方程： (F0 + af*t) / (W0 + aw*t) = p  =>  (af - p*aw) * t = p*W0 - F0
+        denom = (af - p * aw)
+        if denom == 0:
+            return None
+        t_days = (p * W0 - F0) / denom
+        try:
+            # 合理性檢查
+            if t_days is None or t_days <= 0 or not float(t_days) == float(t_days):
+                return None
+        except Exception:
+            return None
+        eta_days = int(round(t_days))
+        eta_date = last_date + timedelta(days=eta_days)
+        return {"days": eta_days, "weeks": eta_days / 7.0, "date": eta_date.date()}
+
+    # 其他指標：直接以該指標序列做趨勢估算
     # choose columns
     if metric == 'fatkg':
         col_am, col_pm = '早上脂肪重量 (kg)', '晚上脂肪重量 (kg)'
@@ -497,6 +534,54 @@ def _compute_eta(wdf_all, wdf_slice, metric: str, target: float, scope: str = 'g
     eta_days = int(round(days_needed))
     eta_date = last_date + _dt.timedelta(days=eta_days)
     return {"days": eta_days, "weeks": eta_days / 7.0, "date": eta_date.date()}
+
+def _compute_slope_per_day(wdf_all, wdf_slice, metric: str, scope: str = 'global', method: str = 'regress28'):
+    """Return linear slope per day for a metric using the same window/method selection as ETA.
+    Returns (slope_per_day, last_date, current_value) or (None, None, None) if insufficient.
+    """
+    import numpy as np
+    import datetime as _dt
+    dfbase = wdf_all if scope == 'global' else wdf_slice
+    if dfbase is None or dfbase.empty:
+        return None, None, None
+    df = dfbase.sort_values('日期').copy()
+    last_date = df['日期'].iloc[-1]
+    if method in ('regress28','endpoint28'):
+        start_cut = last_date - _dt.timedelta(days=27)
+        win = df[df['日期'] >= start_cut]
+    else:
+        win = df
+    if metric == 'fatkg':
+        col_am, col_pm = '早上脂肪重量 (kg)', '晚上脂肪重量 (kg)'
+    elif metric == 'weight':
+        col_am, col_pm = '早上體重 (kg)', '晚上體重 (kg)'
+    else:
+        col_am, col_pm = '早上體脂 (%)', '晚上體脂 (%)'
+    y = win[col_am] if col_am in win.columns else None
+    if y is not None:
+        y = y.dropna()
+    if y is None or y.empty:
+        y = win[col_pm] if col_pm in win.columns else None
+        if y is not None:
+            y = y.dropna()
+    if y is None or y.empty:
+        return None, None, None
+    xdates = win['日期'].loc[y.index]
+    if xdates.empty:
+        return None, None, None
+    x0 = xdates.iloc[0]
+    x = (xdates - x0).dt.days.to_numpy()
+    yy = y.to_numpy(dtype=float)
+    if len(x) < 2 or (x[-1] - x[0]) == 0:
+        return None, last_date, float(yy[-1])
+    # slope selection
+    if method.startswith('endpoint') or len(x) < 3:
+        a = (yy[-1] - yy[0]) / max(1.0, float(x[-1] - x[0]))
+    else:
+        A = np.vstack([x, np.ones_like(x)]).T
+        a, _b = np.linalg.lstsq(A, yy, rcond=None)[0]
+    cur = float(yy[-1])
+    return float(a), last_date, cur
 
 # ---- KPI helpers ----
 def compute_weekly_kpi(stats: dict) -> dict:
@@ -1143,6 +1228,31 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
                 else:
                     md += f"- 脂肪重量達標 ETA：暫無穩定趨勢，無法估算（{_method_label}）  \n"
                     printed_any = True
+                # 以速率區間（實測/理想）提供補充估算：使用脂肪重量作為主要指標
+                # 當前脂肪重量（AM 優先，否則 PM）
+                cur_fw = None
+                if '早上脂肪重量 (kg)' in df_sorted.columns and not df_sorted['早上脂肪重量 (kg)'].dropna().empty:
+                    cur_fw = float(df_sorted['早上脂肪重量 (kg)'].dropna().iloc[-1])
+                elif '晚上脂肪重量 (kg)' in df_sorted.columns and not df_sorted['晚上脂肪重量 (kg)'].dropna().empty:
+                    cur_fw = float(df_sorted['晚上脂肪重量 (kg)'].dropna().iloc[-1])
+                if cur_fw is not None:
+                    gap = max(0.0, cur_fw - target_fatkg)
+                    # 估算近趨勢的實測速率（kg/週）：由每日斜率推回
+                    a_per_day, last_dt, _curval = _compute_slope_per_day(df_sorted, df_sorted, metric='fatkg', scope=scope, method=method)
+                    real_rate = (-a_per_day * 7.0) if (a_per_day is not None and a_per_day < 0) else None
+                    ideal_rate = 0.7  # kg/週（可視需求調整）
+                    lines = []
+                    if real_rate and real_rate > 0:
+                        weeks_real = gap / real_rate if real_rate > 0 else None
+                        if weeks_real:
+                            eta_real_date = (last_dt.date() if last_dt is not None else end_date) + pd.Timedelta(days=int(round(weeks_real*7)))
+                            lines.append(f"  · 以實測速率 (~{real_rate:.2f} kg/週)：~{weeks_real:.0f} 週（{eta_real_date}）")
+                    if ideal_rate and ideal_rate > 0:
+                        weeks_ideal = gap / ideal_rate
+                        eta_ideal_date = (last_dt.date() if last_dt is not None else end_date) + pd.Timedelta(days=int(round(weeks_ideal*7)))
+                        lines.append(f"  · 以理想速率 (~{ideal_rate:.2f} kg/週)：~{weeks_ideal:.1f} 週（{eta_ideal_date}）")
+                    if lines:
+                        md += "  補充（速率區間推估）：\n" + "\n".join(lines) + "\n"
             if gw is not None:
                 scope = (eta_config or {}).get('scope', 'global')
                 method = (eta_config or {}).get('method', 'regress28')
@@ -1159,6 +1269,9 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
                     printed_any = True
             if not printed_any:
                 md += f"- 資料趨勢不足（{_method_label}），暫無 ETA 可供參考  \n"
+            else:
+                # 一致性參考：若假設去脂體重（FFM）近似持平，則體重/體脂率達標時間 ≈ 脂肪重量 ETA
+                md += "  備註：若假設去脂體重持平，體重與體脂率達標時間將與『脂肪重量』ETA 接近。\n"
         except Exception:
             md += "- ETA 計算發生例外，暫無 ETA 可供參考  \n"
     
