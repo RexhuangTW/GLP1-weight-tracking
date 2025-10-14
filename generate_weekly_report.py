@@ -73,11 +73,16 @@ def read_daily_log(master_path, sheet_name=None, header_row=0):
         
         # 解析測量日期時間
         df_raw['測量日期時間'] = pd.to_datetime(df_raw['測量日期'], format='%Y/%m/%d %H:%M')
-        df_raw['日期'] = df_raw['測量日期時間'].dt.date
+        
+        # 調整日期：凌晨 0:00-4:59 算作前一天
+        df_raw['調整日期'] = df_raw['測量日期時間'].apply(
+            lambda dt: (dt - pd.Timedelta(days=1)).date() if dt.hour < 5 else dt.date()
+        )
+        df_raw['日期'] = df_raw['調整日期']
         df_raw['時間'] = df_raw['測量日期時間'].dt.time
         df_raw['小時'] = df_raw['測量日期時間'].dt.hour
         
-        # 分類早上/晚上：早上定義為 5:00-12:00，晚上為其他時間
+        # 分類早上/晚上：早上定義為 5:00-11:59，晚上為 12:00-4:59（隔天）
         df_raw['時段'] = df_raw['小時'].apply(lambda h: 'AM' if 5 <= h < 12 else 'PM')
         
         # 按日期和時段分組，取平均值（若一天有多次測量）
