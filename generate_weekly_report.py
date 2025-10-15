@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
+import calendar
 
 # -------- Chinese font fallback (for charts) --------
 matplotlib.rcParams["font.sans-serif"] = [
@@ -778,7 +779,7 @@ def compute_stats(wdf):
         stats["avg_water"] = None
     return stats
 
-def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle, out_md_path, week_tag, start_date, end_date, kpi_period_label="本週", goals: dict | None = None, eta_config: dict | None = None):
+def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle, out_md_path, week_tag, start_date, end_date, kpi_period_label="本週", goals: dict | None = None, eta_config: dict | None = None, kpi_override: dict | None = None, stats_period_label: str = "本週"):
     # 基本表格
     table_cols = ["日期","早上體重 (kg)","晚上體重 (kg)","早上體脂 (%)","晚上體脂 (%)"]
     if '早上內臟脂肪' in wdf.columns and '晚上內臟脂肪' in wdf.columns:
@@ -809,14 +810,22 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
         charts_section += f"![骨骼肌趨勢]({os.path.basename(png_muscle)})\n"
     charts_section += "\n---\n\n"
 
+    # 平均值標籤（依期間調整顯示字樣）
+    if "週" in stats_period_label:
+        avg_label = "週平均"
+    elif "月" in stats_period_label:
+        avg_label = "月平均"
+    else:
+        avg_label = "平均"
+
     # 內臟脂肪統計
     visceral_stats = ""
     if stats.get("avg_visceral_am") is not None:
         visceral_stats = (
             f"\n- 內臟脂肪（AM）：{_fmt(stats['start_visceral_am'], 1)} → {_fmt(stats['end_visceral_am'], 1)}  "
-            f"(**{_fmt(stats['delta_visceral_am'], 1)}**), 週平均 {stats['avg_visceral_am']:.1f}  \n"
+            f"(**{_fmt(stats['delta_visceral_am'], 1)}**), {avg_label} {stats['avg_visceral_am']:.1f}  \n"
             f"- 內臟脂肪（PM）：{_fmt(stats['start_visceral_pm'], 1)} → {_fmt(stats['end_visceral_pm'], 1)}  "
-            f"(**{_fmt(stats['delta_visceral_pm'], 1)}**), 週平均 {stats['avg_visceral_pm']:.1f}  \n"
+            f"(**{_fmt(stats['delta_visceral_pm'], 1)}**), {avg_label} {stats['avg_visceral_pm']:.1f}  \n"
             f"- 內臟脂肪（AM+PM 平均）：{stats['avg_visceral_all']:.1f}  \n"
             f"  💡 *標準：≤9.5，偏高：10-14.5，過高：≥15*  \n"
         )
@@ -826,9 +835,9 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
     if stats.get("avg_muscle_am") is not None:
         muscle_stats = (
             f"\n- 骨骼肌（AM）：{_fmt(stats['start_muscle_am'], 1)}% → {_fmt(stats['end_muscle_am'], 1)}%  "
-            f"(**{_fmt(stats['delta_muscle_am'], 1)}%**), 週平均 {stats['avg_muscle_am']:.1f}%  \n"
+            f"(**{_fmt(stats['delta_muscle_am'], 1)}%**), {avg_label} {stats['avg_muscle_am']:.1f}%  \n"
             f"- 骨骼肌（PM）：{_fmt(stats['start_muscle_pm'], 1)}% → {_fmt(stats['end_muscle_pm'], 1)}%  "
-            f"(**{_fmt(stats['delta_muscle_pm'], 1)}%**), 週平均 {stats['avg_muscle_pm']:.1f}%  \n"
+            f"(**{_fmt(stats['delta_muscle_pm'], 1)}%**), {avg_label} {stats['avg_muscle_pm']:.1f}%  \n"
             f"- 骨骼肌（AM+PM 平均）：{stats['avg_muscle_all']:.1f}%  \n"
         )
     
@@ -837,9 +846,9 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
     if stats.get("avg_fat_weight_am") is not None:
         fat_weight_stats = (
             f"\n- 脂肪重量（AM）：{_fmt(stats['start_fat_weight_am'], 1)} → {_fmt(stats['end_fat_weight_am'], 1)} kg  "
-            f"(**{_fmt(stats['delta_fat_weight_am'], 1)} kg**), 週平均 {stats['avg_fat_weight_am']:.1f} kg  \n"
+            f"(**{_fmt(stats['delta_fat_weight_am'], 1)} kg**), {avg_label} {stats['avg_fat_weight_am']:.1f} kg  \n"
             f"- 脂肪重量（PM）：{_fmt(stats['start_fat_weight_pm'], 1)} → {_fmt(stats['end_fat_weight_pm'], 1)} kg  "
-            f"(**{_fmt(stats['delta_fat_weight_pm'], 1)} kg**), 週平均 {stats['avg_fat_weight_pm']:.1f} kg  \n"
+            f"(**{_fmt(stats['delta_fat_weight_pm'], 1)} kg**), {avg_label} {stats['avg_fat_weight_pm']:.1f} kg  \n"
             f"- 脂肪重量（AM+PM 平均）：{stats['avg_fat_weight_all']:.1f} kg  \n"
         )
     
@@ -848,9 +857,9 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
     if stats.get("avg_muscle_weight_am") is not None:
         muscle_weight_stats = (
             f"\n- 骨骼肌重量（AM）：{_fmt(stats['start_muscle_weight_am'], 1)} → {_fmt(stats['end_muscle_weight_am'], 1)} kg  "
-            f"(**{_fmt(stats['delta_muscle_weight_am'], 1)} kg**), 週平均 {stats['avg_muscle_weight_am']:.1f} kg  \n"
+            f"(**{_fmt(stats['delta_muscle_weight_am'], 1)} kg**), {avg_label} {stats['avg_muscle_weight_am']:.1f} kg  \n"
             f"- 骨骼肌重量（PM）：{_fmt(stats['start_muscle_weight_pm'], 1)} → {_fmt(stats['end_muscle_weight_pm'], 1)} kg  "
-            f"(**{_fmt(stats['delta_muscle_weight_pm'], 1)} kg**), 週平均 {stats['avg_muscle_weight_pm']:.1f} kg  \n"
+            f"(**{_fmt(stats['delta_muscle_weight_pm'], 1)} kg**), {avg_label} {stats['avg_muscle_weight_pm']:.1f} kg  \n"
             f"- 骨骼肌重量（AM+PM 平均）：{stats['avg_muscle_weight_all']:.1f} kg  \n"
         )
 
@@ -862,12 +871,12 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
         f"{md_table}\n\n"
         "---\n\n"
         f"{charts_section}"
-        "## 📌 本週統計\n\n"
-        f"- 體重（AM）：{_fmt(stats['start_weight_am'])} → {_fmt(stats['end_weight_am'])} kg  (**{_fmt(stats['delta_weight_am'])} kg**), 週平均 {stats['avg_weight_am']:.1f} kg  \n"
-        f"- 體重（PM）：{_fmt(stats['start_weight_pm'])} → {_fmt(stats['end_weight_pm'])} kg  (**{_fmt(stats['delta_weight_pm'])} kg**), 週平均 {stats['avg_weight_pm']:.1f} kg  \n"
+        f"## 📌 {stats_period_label}統計\n\n"
+        f"- 體重（AM）：{_fmt(stats['start_weight_am'])} → {_fmt(stats['end_weight_am'])} kg  (**{_fmt(stats['delta_weight_am'])} kg**), {avg_label} {stats['avg_weight_am']:.1f} kg  \n"
+        f"- 體重（PM）：{_fmt(stats['start_weight_pm'])} → {_fmt(stats['end_weight_pm'])} kg  (**{_fmt(stats['delta_weight_pm'])} kg**), {avg_label} {stats['avg_weight_pm']:.1f} kg  \n"
         f"- 體重（AM+PM 平均）：{stats['avg_weight_all']:.1f} kg  \n\n"
-        f"- 體脂（AM）：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), 週平均 {stats['avg_fat_am']:.1f}%  \n"
-        f"- 體脂（PM）：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), 週平均 {stats['avg_fat_pm']:.1f}%  \n"
+        f"- 體脂（AM）：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), {avg_label} {stats['avg_fat_am']:.1f}%  \n"
+        f"- 體脂（PM）：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), {avg_label} {stats['avg_fat_pm']:.1f}%  \n"
         f"- 體脂（AM+PM 平均）：{stats['avg_fat_all']:.1f}%  \n"
         f"{visceral_stats}"
         f"{muscle_stats}"
@@ -882,7 +891,8 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
     )
 
     # KPI 目標與進度（每週）
-    kpi = compute_weekly_kpi(stats)
+    # 可由外部傳入（例如月度）覆蓋，否則以每週 KPI 為準
+    kpi = kpi_override if isinstance(kpi_override, dict) and kpi_override else compute_weekly_kpi(stats)
     # 現況與達成度
     # 體重
     weight_delta = None
@@ -933,14 +943,20 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
         md += f"\n---\n\n## 🧪 組成品質（近28天）\n\n- 脂肪/體重 下降比例：{ratio*100:.0f}%（{label}）  \n- 體重變化：-{qd['weight_drop']:.1f} kg，脂肪重量變化：-{qd['fat_drop']:.1f} kg（AM）  \n"
 
     md += f"\n---\n\n## 🎯 KPI 目標與進度 ({kpi_period_label})\n\n"
-    md += "- 體重：目標 -0.8 kg  \n"
+    # 體重 KPI
     if kpi.get('weight_start') is not None and kpi.get('weight_target_end') is not None:
+        weight_goal_delta = abs(kpi['weight_target_end'] - kpi['weight_start'])
+        md += f"- 體重：目標 -{weight_goal_delta:.1f} kg  \n"
         md += f"  - 由 {kpi['weight_start']:.1f} → 目標 {kpi['weight_target_end']:.1f} kg  | 進度 {weight_bar}  \n"
-    md += "- 體脂率（AM）：目標 -0.4 個百分點  \n"
+    # 體脂率 KPI
     if kpi.get('fat_pct_start') is not None and kpi.get('fat_pct_target_end') is not None:
+        fat_goal_delta = abs(kpi['fat_pct_target_end'] - kpi['fat_pct_start'])
+        md += f"- 體脂率（AM）：目標 -{fat_goal_delta:.1f} 個百分點  \n"
         md += f"  - 由 {kpi['fat_pct_start']:.1f}% → 目標 {kpi['fat_pct_target_end']:.1f}%  | 進度 {fat_bar}  \n"
-    md += "- 內臟脂肪（AM）：目標 -0.5  \n"
+    # 內臟脂肪 KPI
     if kpi.get('visceral_start') is not None and kpi.get('visceral_target_end') is not None:
+        vis_goal_delta = abs(kpi['visceral_target_end'] - kpi['visceral_start'])
+        md += f"- 內臟脂肪（AM）：目標 -{vis_goal_delta:.1f}  \n"
         md += f"  - 由 {kpi['visceral_start']:.1f} → 目標 {kpi['visceral_target_end']:.1f}  | 進度 {vis_bar}  \n"
     if stats.get('start_muscle_weight_am') is not None and stats.get('end_muscle_weight_am') is not None:
         md += f"- 骨骼肌重量（AM）：目標 ≥ 持平  | 變化 {stats['end_muscle_weight_am']-stats['start_muscle_weight_am']:+.1f} kg  | 進度 {musw_bar}  \n"
@@ -1181,8 +1197,77 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
         f"{muscle_weight_stats}\n"
         f"- **追蹤天數**：{stats['days']} 天{extra}{weekly_analysis}\n\n"
         "---\n\n"
-        "## 🎯 重點成果\n\n"
     )
+
+    # 新增：至今 KPI 目標與進度（以每週 KPI 乘上總週數 total_weeks）
+    try:
+        base_kpi = compute_weekly_kpi(stats)
+        summary_kpi = {}
+        if base_kpi.get('weight_start') is not None:
+            summary_kpi['weight_start'] = base_kpi['weight_start']
+            summary_kpi['weight_target_end'] = base_kpi['weight_start'] - 0.8 * total_weeks
+        if base_kpi.get('fat_pct_start') is not None:
+            summary_kpi['fat_pct_start'] = base_kpi['fat_pct_start']
+            summary_kpi['fat_pct_target_end'] = max(base_kpi['fat_pct_start'] - 0.4 * total_weeks, 0)
+        if base_kpi.get('visceral_start') is not None:
+            summary_kpi['visceral_start'] = base_kpi['visceral_start']
+            summary_kpi['visceral_target_end'] = max(base_kpi['visceral_start'] - 0.5 * total_weeks, 0)
+        if base_kpi.get('muscle_weight_start') is not None:
+            summary_kpi['muscle_weight_start'] = base_kpi['muscle_weight_start']
+            summary_kpi['muscle_weight_target_end'] = base_kpi['muscle_weight_start']
+
+        # 計算進度條
+        # 體重
+        weight_bar = "(無目標)"
+        if summary_kpi.get('weight_start') is not None and summary_kpi.get('weight_target_end') is not None and stats.get('end_weight_am') is not None:
+            weight_goal_delta = abs(summary_kpi['weight_target_end'] - summary_kpi['weight_start'])
+            weight_delta = None
+            if stats.get('start_weight_am') is not None and stats.get('end_weight_am') is not None:
+                weight_delta = abs(stats['end_weight_am'] - stats['start_weight_am'])
+            weight_bar = _progress_bar(current=stats.get('end_weight_am'), target_delta=weight_goal_delta, achieved_delta=weight_delta if weight_delta is not None else 0, inverse=True)
+
+        # 體脂率
+        fat_bar = "(無目標)"
+        if summary_kpi.get('fat_pct_start') is not None and summary_kpi.get('fat_pct_target_end') is not None and stats.get('end_fat_am') is not None:
+            fat_goal_delta = abs(summary_kpi['fat_pct_target_end'] - summary_kpi['fat_pct_start'])
+            fat_delta = None
+            if stats.get('start_fat_am') is not None and stats.get('end_fat_am') is not None:
+                fat_delta = abs(stats['end_fat_am'] - stats['start_fat_am'])
+            fat_bar = _progress_bar(current=stats.get('end_fat_am'), target_delta=fat_goal_delta, achieved_delta=fat_delta if fat_delta is not None else 0, inverse=True)
+
+        # 內臟脂肪
+        vis_bar = "(無目標)"
+        if summary_kpi.get('visceral_start') is not None and summary_kpi.get('visceral_target_end') is not None and stats.get('end_visceral_am') is not None:
+            vis_goal_delta = abs(summary_kpi['visceral_target_end'] - summary_kpi['visceral_start'])
+            vis_delta = None
+            if stats.get('start_visceral_am') is not None and stats.get('end_visceral_am') is not None:
+                vis_delta = abs(stats['end_visceral_am'] - stats['start_visceral_am'])
+            vis_bar = _progress_bar(current=stats.get('end_visceral_am'), target_delta=vis_goal_delta, achieved_delta=vis_delta if vis_delta is not None else 0, inverse=True)
+
+        # 骨骼肌重量
+        musw_bar = "(無目標)"
+        musw_delta = None
+        if stats.get('start_muscle_weight_am') is not None and stats.get('end_muscle_weight_am') is not None:
+            musw_delta = stats['end_muscle_weight_am'] - stats['start_muscle_weight_am']
+            musw_bar = _progress_bar(current=stats.get('end_muscle_weight_am'), target_delta=0.001, achieved_delta=max(0.0, musw_delta), inverse=False)
+
+        # 輸出至今 KPI 區塊
+        md += "## 🎯 KPI 目標與進度（至今）\n\n"
+        if summary_kpi.get('weight_start') is not None and summary_kpi.get('weight_target_end') is not None:
+            md += f"- 體重：目標 -{abs(summary_kpi['weight_target_end'] - summary_kpi['weight_start']):.1f} kg  \n"
+            md += f"  - 由 {summary_kpi['weight_start']:.1f} → 目標 {summary_kpi['weight_target_end']:.1f} kg  | 進度 {weight_bar}  \n"
+        if summary_kpi.get('fat_pct_start') is not None and summary_kpi.get('fat_pct_target_end') is not None:
+            md += f"- 體脂率（AM）：目標 -{abs(summary_kpi['fat_pct_target_end'] - summary_kpi['fat_pct_start']):.1f} 個百分點  \n"
+            md += f"  - 由 {summary_kpi['fat_pct_start']:.1f}% → 目標 {summary_kpi['fat_pct_target_end']:.1f}%  | 進度 {fat_bar}  \n"
+        if summary_kpi.get('visceral_start') is not None and summary_kpi.get('visceral_target_end') is not None:
+            md += f"- 內臟脂肪（AM）：目標 -{abs(summary_kpi['visceral_target_end'] - summary_kpi['visceral_start']):.1f}  \n"
+            md += f"  - 由 {summary_kpi['visceral_start']:.1f} → 目標 {summary_kpi['visceral_target_end']:.1f}  | 進度 {vis_bar}  \n"
+        if stats.get('start_muscle_weight_am') is not None and stats.get('end_muscle_weight_am') is not None:
+            md += f"- 骨骼肌重量（AM）：目標 ≥ 持平  | 變化 {stats['end_muscle_weight_am']-stats['start_muscle_weight_am']:+.1f} kg  | 進度 {musw_bar}  \n"
+        md += "\n---\n\n"
+    except Exception:
+        # 即使 KPI 計算失敗也不影響整體報告
+        pass
     
     # 若有長期目標，加入目標達成進度（以 AM 值為主）
     if goals and (goals.get('weight_final') is not None or goals.get('fat_pct_final') is not None):
@@ -1276,6 +1361,7 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
             md += "- ETA 計算發生例外，暫無 ETA 可供參考  \n"
     
     # 成果分析
+    md += "\n## 🎯 重點成果\n\n"
     if stats['delta_weight_am'] and stats['delta_weight_am'] < 0:
         md += f"✅ **體重減少**：在 {total_days} 天內減重 {abs(stats['delta_weight_am']):.1f} kg（早上測量）  \n"
     if stats['delta_fat_pm'] and stats['delta_fat_pm'] < 0:
@@ -1360,9 +1446,15 @@ def main():
         month_dir = os.path.join(reports_dir, "monthly", ym_tag)
         ensure_dirs(month_dir)
 
-        # 以每週目標為基礎，放大至本月天數/週數
+        # 以每週目標為基礎，放大至本月『實際天數』（含尚未記錄的天），換算月週數
         stats = compute_stats(wdf)
-        weeks = max(1, (len(wdf) + 6) // 7)
+        try:
+            ym_year, ym_month = map(int, ym_tag.split('-'))
+            days_in_month = calendar.monthrange(ym_year, ym_month)[1]
+        except Exception:
+            # 後備：仍以資料天數估算
+            days_in_month = max(1, int(len(wdf)))
+        weeks = max(1, (days_in_month + 6) // 7)
         base_kpi = compute_weekly_kpi(stats)
         # 放大：體重 0.8*weeks、體脂 0.4*weeks、內臟 0.5*weeks
         month_kpi = {}
@@ -1395,7 +1487,23 @@ def main():
         }
         if month_goals['weight_final'] is None and month_goals['fat_pct_final'] is None:
             month_goals = None
-        make_markdown(wdf, stats, weight_png, bodyfat_png, visceral_png, muscle_png, md_path, f"{ym_tag} 月報", start_date, end_date, kpi_period_label="本月", goals=month_goals, eta_config={'scope': args.eta_scope, 'method': args.eta_method})
+        make_markdown(
+            wdf,
+            stats,
+            weight_png,
+            bodyfat_png,
+            visceral_png,
+            muscle_png,
+            md_path,
+            f"{ym_tag} 月報",
+            start_date,
+            end_date,
+            kpi_period_label="本月",
+            goals=month_goals,
+            eta_config={'scope': args.eta_scope, 'method': args.eta_method},
+            kpi_override=month_kpi,
+            stats_period_label="本月",
+        )
         print("✅ 月度報告已完成輸出")
         print("Monthly MD:", md_path)
         return
