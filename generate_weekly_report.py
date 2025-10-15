@@ -7,6 +7,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib
 import calendar
+import numpy as np
+import glob
 
 # -------- Chinese font fallback (for charts) --------
 matplotlib.rcParams["font.sans-serif"] = [
@@ -73,7 +75,11 @@ def read_daily_log(master_path, sheet_name=None, header_row=0):
         df_raw = pd.read_csv(master_path)
         
         # 解析測量日期時間
-        df_raw['測量日期時間'] = pd.to_datetime(df_raw['測量日期'], format='%Y/%m/%d %H:%M')
+        # 支援多種日期格式
+        try:
+            df_raw['測量日期時間'] = pd.to_datetime(df_raw['測量日期'], format='%Y/%m/%d %H:%M')
+        except Exception:
+            df_raw['測量日期時間'] = pd.to_datetime(df_raw['測量日期'])
         
         # 調整日期：凌晨 0:00-4:59 算作前一天
         df_raw['調整日期'] = df_raw['測量日期時間'].apply(
@@ -99,12 +105,24 @@ def read_daily_log(master_path, sheet_name=None, header_row=0):
             # 早上數據
             if not am_data.empty:
                 row['早上體重 (kg)'] = am_data['體重(kg)'].mean()
-                row['早上體脂 (%)'] = am_data['體脂肪(%)'].mean()
-                row['早上內臟脂肪'] = am_data['內臟脂肪程度'].mean()
-                row['早上骨骼肌 (%)'] = am_data['骨骼肌(%)'].mean()
-                # 計算脂肪重量和骨骼肌重量
-                row['早上脂肪重量 (kg)'] = row['早上體重 (kg)'] * row['早上體脂 (%)'] / 100
-                row['早上骨骼肌重量 (kg)'] = row['早上體重 (kg)'] * row['早上骨骼肌 (%)'] / 100
+                row['早上體脂 (%)'] = am_data['體脂肪(%)'].mean() if '體脂肪(%)' in am_data.columns else None
+                row['早上內臟脂肪'] = am_data['內臟脂肪程度'].mean() if '內臟脂肪程度' in am_data.columns else None
+                row['早上骨骼肌 (%)'] = am_data['骨骼肌(%)'].mean() if '骨骼肌(%)' in am_data.columns else None
+                # 優先使用檔內的脂肪/骨骼肌重量欄位，否則以比例推算
+                if '體脂肪量(kg)' in am_data.columns:
+                    row['早上脂肪重量 (kg)'] = am_data['體脂肪量(kg)'].mean()
+                else:
+                    row['早上脂肪重量 (kg)'] = (
+                        row['早上體重 (kg)'] * row['早上體脂 (%)'] / 100
+                        if row.get('早上體重 (kg)') is not None and row.get('早上體脂 (%)') is not None else None
+                    )
+                if '骨骼肌重量(kg)' in am_data.columns:
+                    row['早上骨骼肌重量 (kg)'] = am_data['骨骼肌重量(kg)'].mean()
+                else:
+                    row['早上骨骼肌重量 (kg)'] = (
+                        row['早上體重 (kg)'] * row['早上骨骼肌 (%)'] / 100
+                        if row.get('早上體重 (kg)') is not None and row.get('早上骨骼肌 (%)') is not None else None
+                    )
             else:
                 row['早上體重 (kg)'] = None
                 row['早上體脂 (%)'] = None
@@ -116,12 +134,24 @@ def read_daily_log(master_path, sheet_name=None, header_row=0):
             # 晚上數據
             if not pm_data.empty:
                 row['晚上體重 (kg)'] = pm_data['體重(kg)'].mean()
-                row['晚上體脂 (%)'] = pm_data['體脂肪(%)'].mean()
-                row['晚上內臟脂肪'] = pm_data['內臟脂肪程度'].mean()
-                row['晚上骨骼肌 (%)'] = pm_data['骨骼肌(%)'].mean()
-                # 計算脂肪重量和骨骼肌重量
-                row['晚上脂肪重量 (kg)'] = row['晚上體重 (kg)'] * row['晚上體脂 (%)'] / 100
-                row['晚上骨骼肌重量 (kg)'] = row['晚上體重 (kg)'] * row['晚上骨骼肌 (%)'] / 100
+                row['晚上體脂 (%)'] = pm_data['體脂肪(%)'].mean() if '體脂肪(%)' in pm_data.columns else None
+                row['晚上內臟脂肪'] = pm_data['內臟脂肪程度'].mean() if '內臟脂肪程度' in pm_data.columns else None
+                row['晚上骨骼肌 (%)'] = pm_data['骨骼肌(%)'].mean() if '骨骼肌(%)' in pm_data.columns else None
+                # 優先使用檔內的脂肪/骨骼肌重量欄位，否則以比例推算
+                if '體脂肪量(kg)' in pm_data.columns:
+                    row['晚上脂肪重量 (kg)'] = pm_data['體脂肪量(kg)'].mean()
+                else:
+                    row['晚上脂肪重量 (kg)'] = (
+                        row['晚上體重 (kg)'] * row['晚上體脂 (%)'] / 100
+                        if row.get('晚上體重 (kg)') is not None and row.get('晚上體脂 (%)') is not None else None
+                    )
+                if '骨骼肌重量(kg)' in pm_data.columns:
+                    row['晚上骨骼肌重量 (kg)'] = pm_data['骨骼肌重量(kg)'].mean()
+                else:
+                    row['晚上骨骼肌重量 (kg)'] = (
+                        row['晚上體重 (kg)'] * row['晚上骨骼肌 (%)'] / 100
+                        if row.get('晚上體重 (kg)') is not None and row.get('晚上骨骼肌 (%)') is not None else None
+                    )
             else:
                 row['晚上體重 (kg)'] = None
                 row['晚上體脂 (%)'] = None
@@ -241,6 +271,296 @@ def _fmt(x, digits=1, unit=""):
     if x is None or (isinstance(x, float) and x != x):
         return "-"
     return f"{x:.{digits}f}" + (f" {unit}" if unit else "")
+
+# ---- Window helpers ----
+def slice_last_window(df: pd.DataFrame, days: int) -> pd.DataFrame:
+    if df.empty or days <= 0:
+        return df
+    last_date = df["日期"].max()
+    start_cut = last_date - pd.Timedelta(days=days-1)
+    return df[df["日期"] >= start_cut].copy()
+
+def moving_average(series: pd.Series, window: int, min_periods: int = 3) -> pd.Series:
+    return series.rolling(window=window, min_periods=min_periods).mean()
+
+def series_slope_per_day(series: pd.Series, dates: pd.Series) -> float | None:
+    y = series.dropna()
+    if y.empty:
+        return None
+    xdates = dates.loc[y.index]
+    if xdates.empty:
+        return None
+    x0 = xdates.iloc[0]
+    x = (xdates - x0).dt.days.to_numpy()
+    yy = y.to_numpy(dtype=float)
+    if len(x) < 2 or (x[-1] - x[0]) == 0:
+        return None
+    A = np.vstack([x, np.ones_like(x)]).T
+    a, _b = np.linalg.lstsq(A, yy, rcond=None)[0]
+    return float(a)
+
+# ---- Metabolic analysis ----
+def analyze_metabolic(
+    df: pd.DataFrame,
+    window_days: int = 28,
+    inj_weekday: int | None = None,
+    start_date: str | None = None,
+    mf_mode: str = 'continuous',
+):
+    """Compute window-based metrics, classification, GLP-1 cycle and MF score.
+    Returns dict with keys: window_days, deltas, weekly_rates, ampm_cv, mas, slopes,
+    classification, mf_score, mf_stage, glp1_cycle.
+    """
+    out = {"window_days": window_days}
+    if df.empty:
+        return out
+    # optional crop by start_date
+    sdf = df.copy()
+    if start_date:
+        try:
+            sd = pd.to_datetime(start_date)
+            sdf = sdf[sdf["日期"] >= sd]
+        except Exception:
+            pass
+    win = slice_last_window(sdf, window_days)
+    if win.empty:
+        return out
+    out["start"] = str(win["日期"].min().date())
+    out["end"] = str(win["日期"].max().date())
+
+    def first_last_delta(col_am: str):
+        if col_am not in win.columns:
+            return None
+        s = win[col_am].dropna()
+        if s.empty:
+            return None
+        return float(s.iloc[-1] - s.iloc[0])
+
+    # Deltas (AM preferred)
+    d_weight = first_last_delta('早上體重 (kg)')
+    d_fat_kg = first_last_delta('早上脂肪重量 (kg)')
+    d_mus_kg = first_last_delta('早上骨骼肌重量 (kg)')
+    d_visc = first_last_delta('早上內臟脂肪')
+    n_days = int((win["日期"].max() - win["日期"].min()).days or 1)
+    n_days = max(n_days, 1)
+    out["deltas"] = {
+        "weight": d_weight,
+        "fat_kg": d_fat_kg,
+        "muscle_kg": d_mus_kg,
+        "visceral": d_visc,
+        "days_span": n_days,
+    }
+    # Weekly rates
+    out["weekly_rates"] = {
+        "weight": (d_weight / (n_days/7.0)) if d_weight is not None else None,
+        "fat_kg": (d_fat_kg / (n_days/7.0)) if d_fat_kg is not None else None,
+        "muscle_kg": (d_mus_kg / (n_days/7.0)) if d_mus_kg is not None else None,
+    }
+    # AM/PM diff CV on weight: use relative to mean body weight to avoid exploding when mean(diff)≈0
+    am = win.get('早上體重 (kg)')
+    pm = win.get('晚上體重 (kg)')
+    cv_pct = None
+    if am is not None and pm is not None:
+        diff = (pm - am).dropna()
+        if not diff.empty:
+            sd_diff = float(diff.std())
+            # representative mean body weight over window (AM/PM平均再取整段平均)
+            mw_series = pd.concat([am, pm], axis=1).mean(axis=1).dropna()
+            mean_weight = float(mw_series.mean()) if not mw_series.empty else (float(am.dropna().mean()) if am is not None else None)
+            if mean_weight and mean_weight > 0:
+                cv_pct = (sd_diff / mean_weight) * 100.0
+    out["ampm_cv_pct_weight"] = cv_pct
+    # MAs and slopes
+    out["ma7"] = {
+        "fat_kg": moving_average(win.get('早上脂肪重量 (kg)'), 7).iloc[-1] if '早上脂肪重量 (kg)' in win.columns else None,
+    }
+    out["ma28"] = {
+        "fat_kg": moving_average(win.get('早上脂肪重量 (kg)'), 28).iloc[-1] if '早上脂肪重量 (kg)' in win.columns else None,
+    }
+    out["slopes_per_week"] = {
+        "fat_kg": (series_slope_per_day(win.get('早上脂肪重量 (kg)'), win['日期']) or 0) * 7.0 if '早上脂肪重量 (kg)' in win.columns else None,
+        "muscle_kg": (series_slope_per_day(win.get('早上骨骼肌重量 (kg)'), win['日期']) or 0) * 7.0 if '早上骨骼肌重量 (kg)' in win.columns else None,
+    }
+
+    # Thresholds
+    fat_mean_month = 0.8
+    mus_mean_month_up = 0.5
+    mus_alert_week = 0.3
+    mus_alert_month = 1.0
+    fat_noise = 0.3
+    mus_noise = 0.2
+    visc_meaning = 1.0
+
+    # Classification
+    cls = "其他"
+    reasons = []
+    if d_fat_kg is not None:
+        if abs(d_fat_kg) < fat_noise and (d_mus_kg is None or abs(d_mus_kg) <= mus_noise):
+            cls = "停滯/再平衡"; reasons.append("脂肪與肌肉變化在微小波動內")
+        elif d_fat_kg <= -fat_mean_month and (d_mus_kg is not None and d_mus_kg >= -0.2):
+            cls = "Recomposition"; reasons.append("脂肪↓且肌肉≧持平")
+        elif d_fat_kg <= -fat_mean_month and (d_mus_kg is not None and d_mus_kg < 0):
+            # muscle small drop allowed if <= 0.3 kg/week and <1.0 kg/month
+            wk = abs(out["weekly_rates"].get("muscle_kg") or 0)
+            if wk <= mus_alert_week and abs(d_mus_kg) < mus_alert_month:
+                cls = "穩定減脂"; reasons.append("脂肪達門檻下降，肌肉小幅下降可接受")
+            else:
+                cls = "過度赤字"; reasons.append("肌肉下降超過門檻")
+        elif d_fat_kg >= fat_mean_month:
+            cls = "脂肪回升"; reasons.append("脂肪達門檻上升")
+    out["classification"] = {"label": cls, "reasons": reasons}
+
+    # GLP-1 cycle (inj_weekday as anchor)
+    glp = None
+    if inj_weekday is not None:
+        # For each day compute offset 0..6 from closest past injection weekday
+        tmp = win.copy()
+        tmp['weekday'] = tmp['日期'].dt.weekday
+        # offset: days since last inj_weekday
+        tmp['offset'] = (tmp['weekday'] - inj_weekday) % 7
+        # Aggregate by offset: average deltas using first differences
+        tmp = tmp.sort_values('日期')
+        tmp['fatkg'] = tmp.get('早上脂肪重量 (kg)')
+        tmp['weight'] = tmp.get('早上體重 (kg)')
+        # day-to-day diffs
+        tmp['d_fatkg'] = tmp['fatkg'].diff()
+        tmp['d_weight'] = tmp['weight'].diff()
+        agg = tmp.groupby('offset', dropna=False)[['d_fatkg','d_weight']].mean()
+        if not agg.empty:
+            low_energy_days = [int(i) for i in agg.index if (agg.loc[i, 'd_weight'] is not None and agg.loc[i, 'd_weight'] > 0)]
+            fat_peak_days = [int(i) for i in agg.index if (agg.loc[i, 'd_fatkg'] is not None and agg.loc[i, 'd_fatkg'] < 0)]
+            glp = {
+                "low_energy_offsets": low_energy_days,
+                "fat_loss_peak_offsets": fat_peak_days,
+            }
+    out["glp1_cycle"] = glp
+
+    # Metabolic flexibility (0-100) with modes
+    def _clip01(x: float) -> float:
+        try:
+            return max(0.0, min(1.0, float(x)))
+        except Exception:
+            return 0.0
+    def _sigmoid(z: float, k: float = 6.0) -> float:
+        try:
+            import math
+            return 1.0 / (1.0 + math.exp(-k * z))
+        except Exception:
+            return 0.0
+
+    fat_wk = out['slopes_per_week'].get('fat_kg')
+    mus_wk = out['slopes_per_week'].get('muscle_kg')
+    # F1 (20): Fat weekly slope（Sigmoid 以中段壓縮給分，保守評估）
+    f1_max = 20
+    if fat_wk is None:
+        f1_score = 0.0; f1_reason = '脂肪週斜率：資料不足'
+    else:
+        if mf_mode == 'continuous':
+            # Sigmoid centered at c1 (更負越好)，壓縮中段分數
+            c1 = -0.45  # 中心點（約每週 -0.45 kg）
+            k1 = 6.0    # 斜率係數（越大越陡）
+            t = _sigmoid((c1 - fat_wk), k=k1)
+            f1_score = f1_max * _clip01(t)
+            f1_reason = f"脂肪週斜率 {fat_wk:+.2f} kg/週（Sigmoid：中心 {c1:+.2f}，k={k1:.0f}）"
+        else:
+            f1_score = f1_max if fat_wk <= -0.2 else 0.0
+            f1_reason = f"脂肪週斜率 {fat_wk:+.2f} kg/週（閾值 -0.20）"
+
+    # F2 (20): Muscle weekly slope（Sigmoid 以中段壓縮給分，保守評估）
+    f2_max = 20
+    if mus_wk is None:
+        f2_score = 0.0; f2_reason = '肌肉週斜率：資料不足'
+    else:
+        if mf_mode == 'continuous':
+            # Sigmoid centered at c2（越大越好）
+            c2 = 0.10  # 每週 +0.10 kg 作為中性中心
+            k2 = 6.0
+            t = _sigmoid((mus_wk - c2), k=k2)
+            f2_score = f2_max * _clip01(t)
+            f2_reason = f"肌肉週斜率 {mus_wk:+.2f} kg/週（Sigmoid：中心 {c2:+.2f}，k={k2:.0f}）"
+        else:
+            f2_score = f2_max if mus_wk >= -0.05 else 0.0
+            f2_reason = f"肌肉週斜率 {mus_wk:+.2f} kg/週（閾值 -0.05）"
+
+    # F3 (10): CV 越低越好（將滿分上限降為 10）
+    f3_max = 10
+    if cv_pct is None:
+        f3_score = 0.0; f3_reason = 'CV：資料不足'
+    else:
+        if mf_mode == 'continuous':
+            # Map 4.0%..0.5% to 0..1
+            t = (4.0 - cv_pct) / (4.0 - 0.5)
+            f3_score = f3_max * _clip01(t)
+            f3_reason = f"CV {cv_pct:.2f}%（4.0%→0分，0.5%→滿分）"
+        else:
+            f3_score = f3_max if cv_pct <= 1.5 else 0.0
+            f3_reason = f"CV {cv_pct:.2f}%（閾值 1.5%）"
+
+    # F4 (10): Visceral fat change over window (AM), lower or equal is better
+    f4_max = 10
+    if d_visc is None:
+        f4_score = 0.0; f4_reason = '內臟脂肪：資料不足'
+    else:
+        if mf_mode == 'continuous':
+            # Map +1.0 .. -1.0 to 0..1
+            t = (1.0 - d_visc) / 2.0
+            f4_score = f4_max * _clip01(t)
+            f4_reason = f"內臟脂肪變化 {d_visc:+.2f}（+1→0分，-1→滿分）"
+        else:
+            f4_score = f4_max if d_visc <= 0 else 0.0
+            f4_reason = f"內臟脂肪變化 {d_visc:+.2f}（閾值 ≤0）"
+
+    # F5 (20): 週期穩定度（使用脂肪重量日差的變異性；越穩定越高分）
+    f5_max = 20
+    try:
+        fat_series = None
+        if '早上脂肪重量 (kg)' in win.columns and not win['早上脂肪重量 (kg)'].dropna().empty:
+            fat_series = win['早上脂肪重量 (kg)'].dropna()
+        elif '晚上脂肪重量 (kg)' in win.columns and not win['晚上脂肪重量 (kg)'].dropna().empty:
+            fat_series = win['晚上脂肪重量 (kg)'].dropna()
+        if fat_series is not None and fat_series.shape[0] >= 4:
+            d = fat_series.diff().dropna()
+            sigma = float(d.std()) if not d.empty else None
+        else:
+            sigma = None
+    except Exception:
+        sigma = None
+    if sigma is None:
+        f5_score = 0.0; f5_reason = '週期穩定度：資料不足'
+    else:
+        # 將日差標準差換算為「週差」標準差（×7），並做區間映射
+        sigma_w = sigma * 7.0
+        # 門檻（kg/週）：≤0.2 → 滿分，≥0.8 → 0分（保守）
+        t = (0.8 - sigma_w) / (0.8 - 0.2)
+        f5_score = f5_max * _clip01(t)
+        f5_reason = f"脂肪週期穩定度：週差標準差 {sigma_w:.2f} kg/週（≤0.2→滿分，≥0.8→0分）"
+
+    # F6 (20): Trend consistency (keep thresholded for now)
+    f6_max = 20
+    if fat_wk is None:
+        f6_score = 0.0; f6_reason = '趨勢一致性：資料不足'
+    else:
+        f6_score = f6_max if fat_wk < 0 else 0.0
+        f6_reason = f"脂肪週斜率 {fat_wk:+.2f} kg/週（負向=得分）"
+
+    score = float(f1_score + f2_score + f3_score + f4_score + f5_score + f6_score)
+    out['mf_breakdown'] = [
+        {"key": "F1", "label": "脂肪週斜率", "score": round(float(f1_score),1), "max": f1_max, "reason": f1_reason},
+        {"key": "F2", "label": "肌肉週斜率", "score": round(float(f2_score),1), "max": f2_max, "reason": f2_reason},
+        {"key": "F3", "label": "AM/PM 體重差 CV", "score": round(float(f3_score),1), "max": f3_max, "reason": f3_reason},
+        {"key": "F4", "label": "內臟脂肪變化", "score": round(float(f4_score),1), "max": f4_max, "reason": f4_reason},
+        {"key": "F5", "label": "週期穩定度", "score": round(float(f5_score),1), "max": f5_max, "reason": f5_reason},
+        {"key": "F6", "label": "趨勢一致性", "score": round(float(f6_score),1), "max": f6_max, "reason": f6_reason},
+    ]
+    out['metabolic_flex_score'] = round(score)
+    if score >= 75:
+        stage = '完全進入'
+    elif score >= 60:
+        stage = '過渡期'
+    else:
+        stage = '尚未穩定'
+    out['metabolic_flex_stage'] = stage
+    return out
 
 def save_weekly_excel(wdf, out_excel_path):
     base_cols = REQUIRED_LOGICAL
@@ -660,7 +980,7 @@ def classify_week_status(stats: dict, period: str = 'week') -> tuple[str, list[s
     if period == 'month':
         plateau_fw = 0.3  # kg
         recomp_fw = 0.8   # fat loss threshold per month
-        recomp_musw = 0.0 # muscle stable or gain per month qualifies recomposition
+        recomp_musw = -0.2 # allow muscle stable within ±0.2 kg per month for recomposition
         mus_loss_alert = 1.0 # kg per month
     else:
         plateau_fw = 0.3
@@ -1102,6 +1422,82 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
     except Exception:
         pass
 
+    # 月報：加入代謝分析區塊（以本月實際日數為窗）
+    try:
+        if '月' in stats_period_label:
+            inj_wd = getattr(make_markdown, '_inj_weekday', None)
+            wnd_cli = getattr(make_markdown, '_window_days', None)
+            # 以本月期間長度為主要分析窗，若 CLI 指定更小視窗則取較小值
+            if not wdf.empty:
+                period_days = int((wdf['日期'].max() - wdf['日期'].min()).days) + 1
+                window_days = min(wnd_cli, period_days) if isinstance(wnd_cli, int) and wnd_cli > 0 else period_days
+                mf_mode = getattr(make_markdown, '_mf_mode', 'continuous')
+                meta = analyze_metabolic(wdf, window_days=window_days, inj_weekday=inj_wd, start_date=None, mf_mode=mf_mode)
+                md += "\n## 🔬 代謝分析（本月）\n\n"
+                cls = (meta.get('classification') or {}).get('label')
+                cls_disp = '體態重組' if cls == 'Recomposition' else (cls or '-')
+                md += f"- 代謝分類：**{cls_disp}**\n"
+                fat_w = meta.get('weekly_rates', {}).get('fat_kg')
+                mus_w = meta.get('weekly_rates', {}).get('muscle_kg')
+                if fat_w is not None and mus_w is not None:
+                    md += f"- 每週速率：脂肪 {fat_w:+.2f} kg/週、肌肉 {mus_w:+.2f} kg/週\n"
+                    md += f"- 折合月速率：脂肪 {fat_w*4:+.2f} kg/月、肌肉 {mus_w*4:+.2f} kg/月\n\n"
+                # MF 分數與等級
+                mf_score = meta.get('metabolic_flex_score')
+                mf_stage = meta.get('metabolic_flex_stage') or '-'
+                if mf_score is not None:
+                    if mf_score >= 75:
+                        mf_judge = '優'
+                    elif mf_score >= 60:
+                        mf_judge = '普通'
+                    else:
+                        mf_judge = '需留意'
+                    md += f"- 代謝靈活度（MF）：**{mf_score}**（{mf_stage}｜{mf_judge}）\n"
+                # MF breakdown（子分項）
+                bd = meta.get('mf_breakdown') or []
+                _show_glp1 = bool(getattr(make_markdown, '_show_glp1', False))
+                if not _show_glp1:
+                    bd = [item for item in bd if item.get('key') != 'F5']
+                if bd:
+                    md += "  子分項（F1–F6）：\n"
+                    for item in bd:
+                        md += f"  - {item['key']} {item['label']}：{item['score']}/{item['max']}（{item['reason']}）\n"
+                # CV 指標
+                cv = meta.get('ampm_cv_pct_weight')
+                if cv is not None:
+                    if cv <= 1.5:
+                        cv_judge = '優'
+                    elif cv <= 3.0:
+                        cv_judge = '普通'
+                    else:
+                        cv_judge = '需留意'
+                    md += f"- AM/PM 體重差變異係數（CV）：{cv:.2f}%（{cv_judge}）\n"
+                # GLP-1 週期
+                glp = meta.get('glp1_cycle') or {}
+                _show_glp1 = bool(getattr(make_markdown, '_show_glp1', False))
+                if glp and _show_glp1:
+                    md += f"- GLP‑1 週期（施打日偏移）：低能期 {glp.get('low_energy_offsets')}, 燃脂高峰 {glp.get('fat_loss_peak_offsets')}\n"
+                    # 附註：偏移對應星期幾（0=施打日）
+                    try:
+                        weekday_zh = {0:"週一",1:"週二",2:"週三",3:"週四",4:"週五",5:"週六",6:"週日"}
+                        inj = inj_wd if inj_wd is not None else 4
+                        order = [(inj + i) % 7 for i in range(7)]
+                        mapping = [f"{i}=\u65bd\u6253\u65e5/{weekday_zh[order[i]]}" if i==0 else f"{i}={weekday_zh[order[i]]}" for i in range(7)]
+                        md += "  （偏移對應：" + ", ".join(mapping) + ")\n"
+                        # 今日偏移（以本期最後一筆日期為準）
+                        if not wdf.empty:
+                            last_day = pd.to_datetime(wdf['日期'].max())
+                            wd = int(last_day.weekday())
+                            today_offset = (wd - inj) % 7
+                            wd_label = weekday_zh[wd]
+                            tag = "施打日/" if today_offset == 0 else ""
+                            md += f"  - 今日偏移：{today_offset}（{tag}{wd_label}）\n\n"
+                    except Exception:
+                        md += "\n"
+                md += "---\n\n"
+    except Exception:
+        pass
+
     md += f"\n---\n\n## 🎯 KPI 目標與進度 ({kpi_period_label})\n\n"
     # 體重 KPI
     if kpi.get('weight_start') is not None and kpi.get('weight_target_end') is not None:
@@ -1289,7 +1685,7 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
     else:
         charts_section += "\n---\n\n"
 
-    # 新增：近28天狀態解析（以月度門檻判定）
+    # 新增：近28天狀態解析（以月度門檻判定）與代謝分析
     try:
         last_date_for_win = df_sorted["日期"].iloc[-1]
         win_start = last_date_for_win - timedelta(days=27)
@@ -1297,7 +1693,73 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
         if not last28.empty:
             last28_stats = compute_stats(last28)
             analysis_block = render_status_analysis(last28_stats, period='month', window_hint='近28天')
-            charts_section += analysis_block + "\n---\n\n"
+            charts_section += analysis_block + "\n\n"
+            # 代謝分析（近28天）
+            inj_wd = getattr(make_summary_report, '_inj_weekday', None)
+            start_dt = getattr(make_summary_report, '_start_date', None)
+            wnd = getattr(make_summary_report, '_window_days', 28)
+            mf_mode = getattr(make_summary_report, '_mf_mode', 'continuous')
+            meta = analyze_metabolic(df_sorted, window_days=wnd, inj_weekday=inj_wd, start_date=start_dt, mf_mode=mf_mode)
+            charts_section += "## 🔬 代謝分析（近28天）\n\n"
+            cls = meta.get('classification', {}).get('label')
+            cls_disp = '體態重組' if cls == 'Recomposition' else (cls or '-')
+            charts_section += f"- 代謝分類：**{cls_disp}**\n"
+            fat_w = meta.get('weekly_rates',{}).get('fat_kg') or 0.0
+            mus_w = meta.get('weekly_rates',{}).get('muscle_kg') or 0.0
+            charts_section += f"- 每週速率：脂肪 {fat_w:+.2f} kg/週、肌肉 {mus_w:+.2f} kg/週\n"
+            charts_section += f"- 折合月速率：脂肪 {fat_w*4:+.2f} kg/月、肌肉 {mus_w*4:+.2f} kg/月\n\n"
+            mf_score = meta.get('metabolic_flex_score', 0)
+            mf_stage = meta.get('metabolic_flex_stage', '-')
+            if mf_score >= 75:
+                mf_judge = '優'
+            elif mf_score >= 60:
+                mf_judge = '普通'
+            else:
+                mf_judge = '需留意'
+            charts_section += f"- 代謝靈活度（MF）：**{mf_score}**（{mf_stage}｜{mf_judge}）\n"
+            bd = meta.get('mf_breakdown') or []
+            _show_glp1 = bool(getattr(make_summary_report, '_show_glp1', False))
+            if not _show_glp1:
+                bd = [item for item in bd if item.get('key') != 'F5']
+            if bd:
+                charts_section += "  子分項（F1–F6）：\n"
+                for item in bd:
+                    charts_section += f"  - {item['key']} {item['label']}：{item['score']}/{item['max']}（{item['reason']}）\n"
+
+            cv = meta.get('ampm_cv_pct_weight')
+            if cv is not None:
+                if cv <= 1.5:
+                    cv_judge = '優'
+                elif cv <= 3.0:
+                    cv_judge = '普通'
+                else:
+                    cv_judge = '需留意'
+                charts_section += f"- AM/PM 體重差變異係數（CV）：{cv:.2f}%（{cv_judge}）\n"
+            else:
+                charts_section += "- AM/PM 體重差變異係數（CV）：-\n"
+            # GLP-1 cycle
+            glp = meta.get('glp1_cycle') or {}
+            _show_glp1 = bool(getattr(make_summary_report, '_show_glp1', False))
+            if glp and _show_glp1:
+                charts_section += f"- GLP‑1 週期（施打日偏移）：低能期 {glp.get('low_energy_offsets')}, 燃脂高峰 {glp.get('fat_loss_peak_offsets')}\n"
+                # 附註：偏移對應星期幾（0=施打日）
+                try:
+                    weekday_zh = {0:"週一",1:"週二",2:"週三",3:"週四",4:"週五",5:"週六",6:"週日"}
+                    inj = inj_wd if inj_wd is not None else 4
+                    order = [(inj + i) % 7 for i in range(7)]
+                    mapping = [f"{i}=\u65bd\u6253\u65e5/{weekday_zh[order[i]]}" if i==0 else f"{i}={weekday_zh[order[i]]}" for i in range(7)]
+                    charts_section += "  （偏移對應：" + ", ".join(mapping) + ")\n"
+                    # 今日偏移（以總結最後一筆日期為準）
+                    if not df_sorted.empty:
+                        last_day = pd.to_datetime(df_sorted['日期'].max())
+                        wd = int(last_day.weekday())
+                        today_offset = (wd - inj) % 7
+                        wd_label = weekday_zh[wd]
+                        tag = "施打日/" if today_offset == 0 else ""
+                        charts_section += f"  - 今日偏移：{today_offset}（{tag}{wd_label}）\n\n"
+                except Exception:
+                    charts_section += "\n"
+            charts_section += "---\n\n"
     except Exception:
         pass
     
@@ -1555,12 +2017,50 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
     
     return md, weight_png, bodyfat_png, visceral_png, muscle_png
 
+def _resolve_master_path(master_arg: str | None) -> str:
+    """Resolve the data source path.
+    Priority:
+    1) If master_arg is an existing file path -> use it.
+    2) If master_arg is a directory -> search BodyComposition_*.csv inside.
+    3) If master_arg is None or looks like a prefix -> search CWD for BodyComposition_*.csv.
+    4) Fallback to Excel master 'GLP1_weight_tracking_master.xlsx' if exists.
+    5) Raise ValueError.
+    """
+    # 1) exact file path
+    if master_arg and os.path.isfile(master_arg):
+        return master_arg
+    # 2) directory provided
+    search_dir = None
+    if master_arg and os.path.isdir(master_arg):
+        search_dir = master_arg
+    else:
+        search_dir = os.getcwd()
+    # 3) search for CSV files with the fixed prefix
+    pattern = os.path.join(search_dir, 'BodyComposition_*.csv')
+    matches = glob.glob(pattern)
+    if matches:
+        # pick the most recently modified file
+        matches.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        return matches[0]
+    # 4) fallback: Excel master in search_dir or CWD
+    xlsx1 = os.path.join(search_dir, 'GLP1_weight_tracking_master.xlsx')
+    xlsx2 = 'GLP1_weight_tracking_master.xlsx'
+    if os.path.isfile(xlsx1):
+        return xlsx1
+    if os.path.isfile(xlsx2):
+        return os.path.abspath(xlsx2)
+    raise ValueError("找不到資料檔，請放置 BodyComposition_*.csv 或 GLP1_weight_tracking_master.xlsx，或明確指定 master 路徑")
+
 def main():
     p = argparse.ArgumentParser(description="以週五為起始的自訂週期，從 master 產生 Excel + Markdown + 圖表（支援 CSV/Excel 格式）")
-    p.add_argument("master", nargs="?", default="BodyComposition_202507-202510.csv", help="主檔（CSV 或 Excel 格式）")
+    p.add_argument("master", nargs="?", default=None, help="主檔（CSV 或 Excel 格式）。預設：自動尋找最新 BodyComposition_*.csv")
     p.add_argument("--sheet", default=None, help="工作表名稱（僅用於 Excel，預設先嘗試 'Daily Log'，再退回第一個工作表）")
     p.add_argument("--header-row", type=int, default=0, help="欄位標題所在的列索引（僅用於 Excel，0=第一列）")
     p.add_argument("--anchor-date", default="2025-08-15", help="每週起始的對齊基準日（週四），例如 2025-08-15")
+    p.add_argument("--start-date", default=None, help="分析起始日（e.g., 2025-08-15），影響總結/代謝分析裁剪起點")
+    p.add_argument("--inj-weekday", type=int, default=4, help="GLP-1 施打日（0=Mon … 6=Sun；預設週五=4）")
+    p.add_argument("--window-days", type=int, default=28, help="主要觀察窗天數（預設 28）")
+    p.add_argument("--mf-mode", choices=["continuous","threshold"], default="continuous", help="代謝靈活度（MF）計分模式：continuous=連續分數、threshold=達標記分（預設 continuous）")
     p.add_argument("--week-index", type=int, default=None, help="第幾週（以 anchor-date 為第1週起算）；未提供則取最後一週")
     p.add_argument("--out-root", default=".", help="輸出根目錄（會在裡面建立 weekly/ 與 reports/）")
     p.add_argument("--summary", action="store_true", help="產生從第一天到最新數據的總結報告")
@@ -1570,6 +2070,7 @@ def main():
     p.add_argument("--eta-scope", choices=["global","local"], default="global", help="ETA 計算視窗：global=用全資料最後日回推28天；local=用當前報告子集最後日回推28天")
     p.add_argument("--eta-metric", choices=["fatkg","weight","fatpct"], default="fatkg", help="ETA 主要估算指標：脂肪重量、體重或體脂率")
     p.add_argument("--eta-method", choices=["regress28","endpoint_all","regress_all","endpoint28"], default="endpoint_all", help="ETA 估算方法：regress28=近28天回歸、endpoint_all=首末端點、regress_all=全期間回歸、endpoint28=近28天端點（預設：endpoint_all）")
+    p.add_argument("--show-glp1", action="store_true", help="顯示 GLP‑1 週期（偏移與對應說明）。預設不顯示")
     # 圖表目標線：預設不顯示，使用 --show-target-lines 可打開
     group = p.add_mutually_exclusive_group()
     group.add_argument("--no-target-lines", action="store_true", help="不在圖表上繪製目標參考線（預設）")
@@ -1580,7 +2081,16 @@ def main():
     if not args.no_target_lines and not args.show_target_lines:
         args.no_target_lines = True
 
-    df = read_daily_log(args.master, sheet_name=args.sheet, header_row=args.header_row)
+    # 自動解析資料來源，支援 BodyComposition_*.csv 的自動匹配
+    master_path = _resolve_master_path(args.master)
+    df = read_daily_log(master_path, sheet_name=args.sheet, header_row=args.header_row)
+
+    # 將代謝分析相關 CLI 參數傳遞給報表函式（做為可選屬性）
+    make_markdown._inj_weekday = args.inj_weekday
+    make_markdown._start_date = args.start_date
+    make_markdown._window_days = args.window_days
+    make_markdown._mf_mode = args.mf_mode
+    make_markdown._show_glp1 = args.show_glp1
 
     if args.summary:
         # 產生總結報告
@@ -1589,6 +2099,12 @@ def main():
         ensure_dirs(summary_dir)
         
         chart_show_targets = True if args.show_target_lines else (not args.no_target_lines)
+        # pass meta-analysis controls through function attributes
+        make_summary_report._inj_weekday = args.inj_weekday
+        make_summary_report._start_date = args.start_date
+        make_summary_report._window_days = args.window_days
+        make_summary_report._mf_mode = args.mf_mode
+        make_summary_report._show_glp1 = args.show_glp1
         summary_md, weight_png, bodyfat_png, visceral_png, muscle_png = make_summary_report(
             df, summary_dir, goals={
                 'weight_final': args.goal_weight,

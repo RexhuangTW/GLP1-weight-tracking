@@ -140,6 +140,11 @@ python3 generate_weekly_report.py BodyComposition_202507-202510.csv --summary \
 | `--eta-scope` | ETA 視窗：`global` 使用全資料最後日回推；`local` 僅用目前報告區間 | `global` |
 | `--eta-metric` | ETA 指標：`fatkg`（脂肪重量, 預設）/ `weight` / `fatpct` | `fatkg` |
 | `--eta-method` | ETA 方法：`regress28`（近28天回歸, 預設）/ `endpoint_all`（首末端點, 全期間）/ `regress_all`（全期間回歸）/ `endpoint28`（近28天端點） | `endpoint_all` |
+| `--inj-weekday` | GLP‑1 施打日（0=Mon … 6=Sun；預設週五=4） | `4` |
+| `--window-days` | 代謝分析與組成品質主要觀察窗天數 | `28` |
+| `--start-date` | 分析起始日（裁剪資料的起點，影響 summary/代謝分析） | `2025-08-15` |
+| `--mf-mode` | 代謝靈活度（MF）計分模式：`continuous`（連續分數，預設）/ `threshold`（達標記分） | `continuous` |
+| `--show-glp1` | 顯示 GLP‑1 週期偏移說明（預設不顯示） | （flag） |
 | `--show-target-lines` | 在圖表上繪製目標參考線（預設不顯示） | （flag） |
 | `--no-target-lines` | 不繪製目標參考線（預設） | （flag） |
 
@@ -223,6 +228,7 @@ python3 generate_weekly_report.py BodyComposition_202507-202510.csv --summary --
 - 如果想把 anchor 改成其他日期（例如療程第二階段），只要改 `--anchor-date` 即可。
 - 建議定期備份 CSV 檔案，避免數據遺失。
  - 圖表包含「7 日移動平均」。目標線預設關閉，需顯示可加入 `--show-target-lines`。
+ - GLP‑1 相關輸出預設隱藏；若需顯示，請加上 `--show-glp1`。同時，當 GLP‑1 隱藏時，MF 子分項會自動省略 F5（GLP‑1 週期品質）。
 
 ---
 
