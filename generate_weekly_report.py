@@ -639,6 +639,158 @@ def _progress_bar(current: float, target_delta: float, achieved_delta: float, wi
     bar = '█' * filled + '░' * (width - filled)
     return f"[{bar}] {ratio*100:.0f}%"
 
+# ---- Weekly classification: plateau vs recomposition ----
+def classify_week_status(stats: dict, period: str = 'week') -> tuple[str, list[str]]:
+    """Classify weekly status using AM deltas.
+    Returns (label, reasons)
+    - 脂肪停滯: 早上脂肪重量變化 >= -0.1 kg（幾乎無下降或上升）
+    - recomposition: 早上脂肪重量下降 <= -0.2 kg 且 早上骨骼肌重量上升 >= +0.1 kg
+    - 其他: 無法明確歸類（例如兩者同降或幅度落在灰區）
+    """
+    reasons: list[str] = []
+    dfw = stats.get('delta_fat_weight_am')  # end - start（負值為下降）
+    dmusw = stats.get('delta_muscle_weight_am')
+    label = "其他"
+
+    # Guard: need at least fat weight delta
+    if dfw is None or (isinstance(dfw, float) and dfw != dfw):
+        return "資料不足", ["本週脂肪重量數據不足，無法判讀"]
+
+    # thresholds by period
+    if period == 'month':
+        plateau_fw = 0.3  # kg
+        recomp_fw = 0.8   # fat loss threshold per month
+        recomp_musw = 0.0 # muscle stable or gain per month qualifies recomposition
+        mus_loss_alert = 1.0 # kg per month
+    else:
+        plateau_fw = 0.3
+        recomp_fw = 0.3
+        recomp_musw = 0.2
+        mus_loss_alert = 0.3
+
+    # Plateau threshold: within measurement noise for fat mass
+    if abs(dfw) < plateau_fw:
+        label = "脂肪停滯"
+        reasons.append((f"脂肪重量 {dfw:+.1f} kg（AM），幅度 < {plateau_fw:.1f} kg"))
+        # Muscle context if available
+        if dmusw is not None:
+            reasons.append(f"骨骼肌重量 {dmusw:+.1f} kg（AM）")
+        return label, reasons
+
+    # Recomposition: fat ↓ beyond noise AND muscle ↑ beyond noise
+    if dfw <= -recomp_fw and (dmusw is not None and dmusw >= recomp_musw):
+        label = "recomposition"
+        reasons.append(f"脂肪重量 -{abs(dfw):.1f} kg（AM）")
+        reasons.append(f"骨骼肌重量 +{dmusw:.1f} kg（AM）")
+        return label, reasons
+
+    # Otherwise: ambiguous/other
+    if dfw < 0:
+        reasons.append(f"脂肪重量 -{abs(dfw):.1f} kg（AM）")
+    if dmusw is not None:
+        reasons.append(f"骨骼肌重量 {dmusw:+.1f} kg（AM）")
+    # Muscle-loss alert if beyond threshold per period
+    if dmusw is not None and dmusw <= -mus_loss_alert:
+        unit = '月' if period == 'month' else '週'
+        reasons.append(f"⚠️ 骨骼肌下降警訊（>{mus_loss_alert:.1f} kg/{unit}）")
+    return label, reasons
+
+def render_status_analysis(stats: dict, period: str = 'week', window_hint: str | None = None) -> str:
+    """Render a rich status analysis section with a table and combined judgement.
+    period: 'week' | 'month'
+    Uses AM deltas.
+    """
+    dfw = stats.get('delta_fat_weight_am')
+    dmusw = stats.get('delta_muscle_weight_am')
+    # thresholds
+    if period == 'month':
+        fat_noise = 0.3; fat_meaning = 0.8; fat_signif = 1.5
+        mus_noise = 0.2; mus_meaning = 0.5; mus_signif = 1.0
+        fat_rule_label = "有效下降 ≥ 0.8 kg／月"
+        mus_rule_label = "有效上升 ≥ 0.5 kg／月（±0.2 kg 為誤差範圍）"
+    else:
+        fat_noise = 0.3; fat_meaning = 0.3; fat_signif = 0.8  # weekly: treat ≥0.3 as meaning, ≥0.8 as signif
+        mus_noise = 0.2; mus_meaning = 0.2; mus_signif = 0.5
+        fat_rule_label = "有效下降 ≥ 0.3 kg／週"
+        mus_rule_label = "有效上升 ≥ 0.2 kg／週（±0.2 kg 為誤差範圍）"
+
+    def _fmt_delta(v, unit="kg"):
+        if v is None or (isinstance(v, float) and v != v):
+            return "-"
+        sign = "+" if v > 0 else ("-" if v < 0 else "±")
+        return f"{sign}{abs(v):.1f} {unit}"
+
+    # fat judgement
+    fat_judge = "-"
+    if dfw is not None and not (isinstance(dfw, float) and dfw != dfw):
+        if period == 'month':
+            # 月報：以使用者語彙為主，統一顯示「明顯下降」
+            if dfw <= -fat_meaning:
+                fat_judge = "✅ 脂肪明顯下降"
+            elif abs(dfw) < fat_noise:
+                fat_judge = "⚖️ 波動/停滯"
+            elif dfw < 0:
+                fat_judge = "⚖️ 脂肪下降（尚未達顯著）"
+            elif dfw >= fat_meaning:
+                fat_judge = "⚠️ 脂肪明顯上升"
+            else:
+                fat_judge = "⚠️ 脂肪上升（幅度有限）"
+        elif abs(dfw) < fat_noise:
+            fat_judge = "⚖️ 波動/停滯"
+        elif dfw < 0:
+            fat_judge = "⚖️ 脂肪下降（尚未達顯著）"
+        elif dfw >= fat_meaning:
+            fat_judge = "⚠️ 脂肪明顯上升"
+        else:
+            fat_judge = "⚠️ 脂肪上升（幅度有限）"
+
+    # muscle judgement
+    mus_judge = "-"
+    if dmusw is not None and not (isinstance(dmusw, float) and dmusw != dmusw):
+        if dmusw >= mus_signif:
+            mus_judge = "✅ 肌肉顯著上升"
+        elif dmusw >= mus_meaning:
+            mus_judge = "✅ 肌肉有效上升"
+        elif abs(dmusw) <= mus_noise:
+            mus_judge = "⚖️ 穩定（在誤差範圍）"
+        elif dmusw > 0:
+            mus_judge = "⚖️ 穩定或微幅上升" if period == 'month' else "⚖️ 微幅上升"
+        elif dmusw <= -mus_signif:
+            mus_judge = "⚠️ 肌肉顯著下降"
+        elif dmusw <= -mus_meaning:
+            mus_judge = "⚠️ 肌肉有效下降"
+        else:
+            mus_judge = "⚠️ 微幅下降"
+
+    # overall classification
+    label, _reasons = classify_week_status(stats, period=period)
+    title = "本期狀態解析"
+    if window_hint:
+        title += f"（{window_hint}）"
+    overall_lines = [f"\n## 🧭 {title}\n",
+                     "\n| 指標 | 變化量 | 對照門檻 | 判定 |\n|:--|:--:|:--|:--|\n",
+                     f"| 脂肪重量 (AM) | {_fmt_delta(dfw)} | {fat_rule_label} | {fat_judge} |\n",
+                     f"| 骨骼肌重量 (AM) | {_fmt_delta(dmusw)} | {mus_rule_label} | {mus_judge} |\n\n",
+                     "### 🔍 綜合判定\n\n" ]
+
+    if label == 'recomposition':
+        overall_lines.append("🟢 分類：**體態重組（Recomposition）**\n")
+        overall_lines.append("這表示你目前正處於理想的「脂肪減少＋肌肉維持或略增」階段。\n\n")
+        overall_lines.append("這種情況的特徵：\n\n")
+        overall_lines.append("- 體重變化不一定大，但腰圍、體態、線條會顯著改善。\n")
+        overall_lines.append("- 代謝效率正在提升（BMR 通常會微升）。\n")
+    elif label == '脂肪停滯':
+        overall_lines.append("🟡 分類：**脂肪停滯**\n")
+        overall_lines.append("建議檢查總熱量赤字與日常活動量，並持續追蹤 1–2 週。\n")
+    elif label == '資料不足':
+        overall_lines.append("⚪ 分類：**資料不足**\n")
+        overall_lines.append("目前脂肪重量數據不足，建議補齊測量再觀察。\n")
+    else:
+        overall_lines.append("🔵 分類：**其他**\n")
+        overall_lines.append("本期變化方向不明顯或存在相反趨勢，建議以 4 週趨勢為準。\n")
+
+    return "".join(overall_lines)
+
 def compute_stats(wdf):
     wdf_sorted = wdf.sort_values("日期")
     sw_am, ew_am = _first_last_valid(wdf_sorted["早上體重 (kg)"])
@@ -942,6 +1094,14 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
         label = "良好" if ratio >= 0.6 else ("普通" if ratio >= 0.4 else "需留意")
         md += f"\n---\n\n## 🧪 組成品質（近28天）\n\n- 脂肪/體重 下降比例：{ratio*100:.0f}%（{label}）  \n- 體重變化：-{qd['weight_drop']:.1f} kg，脂肪重量變化：-{qd['fat_drop']:.1f} kg（AM）  \n"
 
+    # 每週/每月狀態判讀（僅在週報顯示；月報可選擇性顯示，目前也顯示以利參考）
+    try:
+        period_kind = 'month' if ('月' in stats_period_label) else 'week'
+        analysis_block = render_status_analysis(stats, period=period_kind)
+        md += "\n---\n\n" + analysis_block + "\n"
+    except Exception:
+        pass
+
     md += f"\n---\n\n## 🎯 KPI 目標與進度 ({kpi_period_label})\n\n"
     # 體重 KPI
     if kpi.get('weight_start') is not None and kpi.get('weight_target_end') is not None:
@@ -1128,6 +1288,18 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
         )
     else:
         charts_section += "\n---\n\n"
+
+    # 新增：近28天狀態解析（以月度門檻判定）
+    try:
+        last_date_for_win = df_sorted["日期"].iloc[-1]
+        win_start = last_date_for_win - timedelta(days=27)
+        last28 = df_sorted[df_sorted["日期"] >= win_start]
+        if not last28.empty:
+            last28_stats = compute_stats(last28)
+            analysis_block = render_status_analysis(last28_stats, period='month', window_hint='近28天')
+            charts_section += analysis_block + "\n---\n\n"
+    except Exception:
+        pass
     
     # 內臟脂肪統計
     visceral_stats = ""
