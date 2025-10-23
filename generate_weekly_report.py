@@ -1462,7 +1462,18 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
                 mus_w = meta.get('weekly_rates', {}).get('muscle_kg')
                 if fat_w is not None and mus_w is not None:
                     md += f"- 每週速率：脂肪 {fat_w:+.2f} kg/週、肌肉 {mus_w:+.2f} kg/週\n"
-                    md += f"- 折合月速率：脂肪 {fat_w*4:+.2f} kg/月、肌肉 {mus_w*4:+.2f} kg/月\n\n"
+                    # Calculate 30-day based monthly rates directly from deltas
+                    deltas = meta.get('deltas', {})
+                    days_span = deltas.get('days_span', 1)
+                    fat_delta = deltas.get('fat_kg')
+                    mus_delta = deltas.get('muscle_kg')
+                    if fat_delta is not None and mus_delta is not None and days_span > 0:
+                        fat_monthly = fat_delta * (30.0 / days_span)
+                        mus_monthly = mus_delta * (30.0 / days_span)
+                        md += f"- 折合月速率（30天）：脂肪 {fat_monthly:+.2f} kg/月、肌肉 {mus_monthly:+.2f} kg/月\n\n"
+                    else:
+                        # Fallback to old method if deltas not available
+                        md += f"- 折合月速率：脂肪 {fat_w*4:+.2f} kg/月、肌肉 {mus_w*4:+.2f} kg/月\n\n"
                 # MF 分數與等級
                 mf_score = meta.get('metabolic_flex_score')
                 mf_stage = meta.get('metabolic_flex_stage') or '-'
@@ -1476,9 +1487,7 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
                     md += f"- 代謝靈活度（MF）：**{mf_score}**（{mf_stage}｜{mf_judge}）\n"
                 # MF breakdown（子分項）
                 bd = meta.get('mf_breakdown') or []
-                _show_glp1 = bool(getattr(make_markdown, '_show_glp1', False))
-                if not _show_glp1:
-                    bd = [item for item in bd if item.get('key') != 'F5']
+                # F5 is now cycle stability (not GLP-1 related), so always show all F1-F6
                 if bd:
                     md += "  子分項（F1–F6）：\n"
                     for item in bd:
@@ -1730,7 +1739,18 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
             fat_w = meta.get('weekly_rates',{}).get('fat_kg') or 0.0
             mus_w = meta.get('weekly_rates',{}).get('muscle_kg') or 0.0
             charts_section += f"- 每週速率：脂肪 {fat_w:+.2f} kg/週、肌肉 {mus_w:+.2f} kg/週\n"
-            charts_section += f"- 折合月速率：脂肪 {fat_w*4:+.2f} kg/月、肌肉 {mus_w*4:+.2f} kg/月\n\n"
+            # Calculate 30-day based monthly rates directly from deltas
+            deltas = meta.get('deltas', {})
+            days_span = deltas.get('days_span', 1)
+            fat_delta = deltas.get('fat_kg')
+            mus_delta = deltas.get('muscle_kg')
+            if fat_delta is not None and mus_delta is not None and days_span > 0:
+                fat_monthly = fat_delta * (30.0 / days_span)
+                mus_monthly = mus_delta * (30.0 / days_span)
+                charts_section += f"- 折合月速率（30天）：脂肪 {fat_monthly:+.2f} kg/月、肌肉 {mus_monthly:+.2f} kg/月\n\n"
+            else:
+                # Fallback to old method if deltas not available
+                charts_section += f"- 折合月速率：脂肪 {fat_w*4:+.2f} kg/月、肌肉 {mus_w*4:+.2f} kg/月\n\n"
             mf_score = meta.get('metabolic_flex_score', 0)
             mf_stage = meta.get('metabolic_flex_stage', '-')
             if mf_score >= 75:
@@ -1741,9 +1761,7 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
                 mf_judge = '需留意'
             charts_section += f"- 代謝靈活度（MF）：**{mf_score}**（{mf_stage}｜{mf_judge}）\n"
             bd = meta.get('mf_breakdown') or []
-            _show_glp1 = bool(getattr(make_summary_report, '_show_glp1', False))
-            if not _show_glp1:
-                bd = [item for item in bd if item.get('key') != 'F5']
+            # F5 is now cycle stability (not GLP-1 related), so always show all F1-F6
             if bd:
                 charts_section += "  子分項（F1–F6）：\n"
                 for item in bd:
