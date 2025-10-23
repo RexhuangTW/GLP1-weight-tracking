@@ -812,14 +812,24 @@ def _compute_eta(wdf_all, wdf_slice, metric: str, target: float, scope: str = 'g
     else:
         col_am, col_pm = '早上體脂 (%)', '晚上體脂 (%)'
         direction = 'down'
-    # series pick (AM preferred, drop NaNs; fallback to PM if AM無有效值)
-    y = win[col_am] if col_am in win.columns else None
-    if y is not None:
-        y = y.dropna()
-    if y is None or y.empty:
+    # series pick (PM preferred for fatpct trend analysis, fallback to AM if PM無有效值)
+    if metric == 'fatpct':
         y = win[col_pm] if col_pm in win.columns else None
         if y is not None:
             y = y.dropna()
+        if y is None or y.empty:
+            y = win[col_am] if col_am in win.columns else None
+            if y is not None:
+                y = y.dropna()
+    else:
+        # For weight and fatkg, keep AM preferred
+        y = win[col_am] if col_am in win.columns else None
+        if y is not None:
+            y = y.dropna()
+        if y is None or y.empty:
+            y = win[col_pm] if col_pm in win.columns else None
+            if y is not None:
+                y = y.dropna()
     if y is None or y.empty:
         return None
     # 將日期與有效值對齊
@@ -878,13 +888,24 @@ def _compute_slope_per_day(wdf_all, wdf_slice, metric: str, scope: str = 'global
         col_am, col_pm = '早上體重 (kg)', '晚上體重 (kg)'
     else:
         col_am, col_pm = '早上體脂 (%)', '晚上體脂 (%)'
-    y = win[col_am] if col_am in win.columns else None
-    if y is not None:
-        y = y.dropna()
-    if y is None or y.empty:
+    
+    # PM preferred for fatpct trend analysis, AM preferred for others
+    if metric == 'fatpct':
         y = win[col_pm] if col_pm in win.columns else None
         if y is not None:
             y = y.dropna()
+        if y is None or y.empty:
+            y = win[col_am] if col_am in win.columns else None
+            if y is not None:
+                y = y.dropna()
+    else:
+        y = win[col_am] if col_am in win.columns else None
+        if y is not None:
+            y = y.dropna()
+        if y is None or y.empty:
+            y = win[col_pm] if col_pm in win.columns else None
+            if y is not None:
+                y = y.dropna()
     if y is None or y.empty:
         return None, None, None
     xdates = win['日期'].loc[y.index]
@@ -917,10 +938,10 @@ def compute_weekly_kpi(stats: dict) -> dict:
     if ws is not None:
         kpi['weight_start'] = ws
         kpi['weight_target_end'] = ws - 0.8
-    # fat percent (AM): weekly drop target ~0.4 pp
-    fps = stats.get('start_fat_am')
+    # fat percent (PM preferred for trend): weekly drop target ~0.4 pp
+    fps = stats.get('start_fat_pm')
     if fps is None:
-        fps = stats.get('start_fat_pm')
+        fps = stats.get('start_fat_am')
     if fps is not None:
         kpi['fat_pct_start'] = fps
         kpi['fat_pct_target_end'] = max(fps - 0.4, 0)
@@ -1347,8 +1368,8 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
         f"- 體重（AM）：{_fmt(stats['start_weight_am'])} → {_fmt(stats['end_weight_am'])} kg  (**{_fmt(stats['delta_weight_am'])} kg**), {avg_label} {stats['avg_weight_am']:.1f} kg  \n"
         f"- 體重（PM）：{_fmt(stats['start_weight_pm'])} → {_fmt(stats['end_weight_pm'])} kg  (**{_fmt(stats['delta_weight_pm'])} kg**), {avg_label} {stats['avg_weight_pm']:.1f} kg  \n"
         f"- 體重（AM+PM 平均）：{stats['avg_weight_all']:.1f} kg  \n\n"
-        f"- 體脂（AM）：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), {avg_label} {stats['avg_fat_am']:.1f}%  \n"
-        f"- 體脂（PM）：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), {avg_label} {stats['avg_fat_pm']:.1f}%  \n"
+        f"- 體脂（PM 趨勢基準）：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), {avg_label} {stats['avg_fat_pm']:.1f}%  \n"
+        f"- 體脂（AM 對照）：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), {avg_label} {stats['avg_fat_am']:.1f}%  \n"
         f"- 體脂（AM+PM 平均）：{stats['avg_fat_all']:.1f}%  \n"
         f"{visceral_stats}"
         f"{muscle_stats}"
@@ -1376,12 +1397,12 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
         achieved_delta=weight_delta if weight_delta is not None else 0,
         inverse=True
     )
-    # 體脂率
+    # 體脂率 (PM 為趨勢基準)
     fat_delta = None
-    if stats.get('start_fat_am') is not None and stats.get('end_fat_am') is not None:
-        fat_delta = abs(stats['end_fat_am'] - stats['start_fat_am'])
+    if stats.get('start_fat_pm') is not None and stats.get('end_fat_pm') is not None:
+        fat_delta = abs(stats['end_fat_pm'] - stats['start_fat_pm'])
     fat_bar = _progress_bar(
-        current=stats.get('end_fat_am'),
+        current=stats.get('end_fat_pm'),
         target_delta=abs(kpi.get('fat_pct_target_end') - kpi.get('fat_pct_start')) if kpi.get('fat_pct_target_end') is not None and kpi.get('fat_pct_start') is not None else None,
         achieved_delta=fat_delta if fat_delta is not None else 0,
         inverse=True
@@ -1504,10 +1525,11 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
         weight_goal_delta = abs(kpi['weight_target_end'] - kpi['weight_start'])
         md += f"- 體重：目標 -{weight_goal_delta:.1f} kg  \n"
         md += f"  - 由 {kpi['weight_start']:.1f} → 目標 {kpi['weight_target_end']:.1f} kg  | 進度 {weight_bar}  \n"
-    # 體脂率 KPI
+    # 體脂率 KPI - determine label based on which body fat value we're using (PM preferred)
     if kpi.get('fat_pct_start') is not None and kpi.get('fat_pct_target_end') is not None:
         fat_goal_delta = abs(kpi['fat_pct_target_end'] - kpi['fat_pct_start'])
-        md += f"- 體脂率（AM）：目標 -{fat_goal_delta:.1f} 個百分點  \n"
+        fat_label = "PM 趨勢基準" if stats.get('end_fat_pm') is not None else "AM"
+        md += f"- 體脂率（{fat_label}）：目標 -{fat_goal_delta:.1f} 個百分點  \n"
         md += f"  - 由 {kpi['fat_pct_start']:.1f}% → 目標 {kpi['fat_pct_target_end']:.1f}%  | 進度 {fat_bar}  \n"
     # 內臟脂肪 KPI
     if kpi.get('visceral_start') is not None and kpi.get('visceral_target_end') is not None:
@@ -1548,7 +1570,8 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
                 method = (eta_config or {}).get('method', 'regress28')
                 eta_f = _compute_eta(wdf_all=wdf, wdf_slice=wdf, metric='fatpct', target=gf, scope=scope, method=method)
                 if eta_f:
-                    md += f"- 體脂率達標 ETA（AM）：~{eta_f['weeks']:.1f} 週（{eta_f['date']}）  \n"
+                    fat_eta_label = "PM 趨勢基準" if stats.get('end_fat_pm') is not None else "AM"
+                    md += f"- 體脂率達標 ETA（{fat_eta_label}）：~{eta_f['weeks']:.1f} 週（{eta_f['date']}）  \n"
         except Exception:
             pass
         if fat_eta_line:
@@ -1822,8 +1845,8 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
         f"- **體重（AM）**：{_fmt(stats['start_weight_am'])} → {_fmt(stats['end_weight_am'])} kg  (**{_fmt(stats['delta_weight_am'])} kg**), 總平均 {stats['avg_weight_am']:.1f} kg  \n"
         f"- **體重（PM）**：{_fmt(stats['start_weight_pm'])} → {_fmt(stats['end_weight_pm'])} kg  (**{_fmt(stats['delta_weight_pm'])} kg**), 總平均 {stats['avg_weight_pm']:.1f} kg  \n"
         f"- **體重（AM+PM 平均）**：{stats['avg_weight_all']:.1f} kg  \n\n"
-        f"- **體脂（AM）**：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), 總平均 {stats['avg_fat_am']:.1f}%  \n"
-        f"- **體脂（PM）**：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), 總平均 {stats['avg_fat_pm']:.1f}%  \n"
+        f"- **體脂（PM 趨勢基準）**：{_fmt(stats['start_fat_pm'])}% → {_fmt(stats['end_fat_pm'])}%  (**{_fmt(stats['delta_fat_pm'])}%**), 總平均 {stats['avg_fat_pm']:.1f}%  \n"
+        f"- **體脂（AM 對照）**：{_fmt(stats['start_fat_am'])}% → {_fmt(stats['end_fat_am'])}%  (**{_fmt(stats['delta_fat_am'])}%**), 總平均 {stats['avg_fat_am']:.1f}%  \n"
         f"- **體脂（AM+PM 平均）**：{stats['avg_fat_all']:.1f}%  \n"
         f"{visceral_stats}"
         f"{muscle_stats}"
@@ -1862,12 +1885,15 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
 
         # 體脂率
         fat_bar = "(無目標)"
-        if summary_kpi.get('fat_pct_start') is not None and summary_kpi.get('fat_pct_target_end') is not None and stats.get('end_fat_am') is not None:
+        # Prefer PM for body fat trends, fallback to AM
+        end_fat = stats.get('end_fat_pm') if stats.get('end_fat_pm') is not None else stats.get('end_fat_am')
+        start_fat = stats.get('start_fat_pm') if stats.get('start_fat_pm') is not None else stats.get('start_fat_am')
+        if summary_kpi.get('fat_pct_start') is not None and summary_kpi.get('fat_pct_target_end') is not None and end_fat is not None:
             fat_goal_delta = abs(summary_kpi['fat_pct_target_end'] - summary_kpi['fat_pct_start'])
             fat_delta = None
-            if stats.get('start_fat_am') is not None and stats.get('end_fat_am') is not None:
-                fat_delta = abs(stats['end_fat_am'] - stats['start_fat_am'])
-            fat_bar = _progress_bar(current=stats.get('end_fat_am'), target_delta=fat_goal_delta, achieved_delta=fat_delta if fat_delta is not None else 0, inverse=True)
+            if start_fat is not None and end_fat is not None:
+                fat_delta = abs(end_fat - start_fat)
+            fat_bar = _progress_bar(current=end_fat, target_delta=fat_goal_delta, achieved_delta=fat_delta if fat_delta is not None else 0, inverse=True)
 
         # 內臟脂肪
         vis_bar = "(無目標)"
@@ -1891,7 +1917,9 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
             md += f"- 體重：目標 -{abs(summary_kpi['weight_target_end'] - summary_kpi['weight_start']):.1f} kg  \n"
             md += f"  - 由 {summary_kpi['weight_start']:.1f} → 目標 {summary_kpi['weight_target_end']:.1f} kg  | 進度 {weight_bar}  \n"
         if summary_kpi.get('fat_pct_start') is not None and summary_kpi.get('fat_pct_target_end') is not None:
-            md += f"- 體脂率（AM）：目標 -{abs(summary_kpi['fat_pct_target_end'] - summary_kpi['fat_pct_start']):.1f} 個百分點  \n"
+            # Determine label based on which body fat value we're using (PM preferred)
+            fat_label = "PM 趨勢基準" if stats.get('end_fat_pm') is not None else "AM"
+            md += f"- 體脂率（{fat_label}）：目標 -{abs(summary_kpi['fat_pct_target_end'] - summary_kpi['fat_pct_start']):.1f} 個百分點  \n"
             md += f"  - 由 {summary_kpi['fat_pct_start']:.1f}% → 目標 {summary_kpi['fat_pct_target_end']:.1f}%  | 進度 {fat_bar}  \n"
         if summary_kpi.get('visceral_start') is not None and summary_kpi.get('visceral_target_end') is not None:
             md += f"- 內臟脂肪（AM）：目標 -{abs(summary_kpi['visceral_target_end'] - summary_kpi['visceral_start']):.1f}  \n"
@@ -1914,14 +1942,18 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
             achieved = (start_w - end_w) if (start_w is not None and end_w is not None) else None
             w_bar = _progress_bar(current=end_w, target_delta=abs(total_drop) if total_drop is not None else None, achieved_delta=abs(achieved) if achieved is not None else 0, inverse=True)
             md += f"- 體重目標：{start_w:.1f} → {goal_w:.1f} kg  | 目前 {end_w:.1f} kg  | 進度 {w_bar}  \n"
-        if goals.get('fat_pct_final') is not None and stats.get('end_fat_am') is not None:
-            start_f = stats.get('start_fat_am')
-            end_f = stats.get('end_fat_am')
+        # Prefer PM for body fat trends, fallback to AM
+        end_fat_goal = stats.get('end_fat_pm') if stats.get('end_fat_pm') is not None else stats.get('end_fat_am')
+        start_fat_goal = stats.get('start_fat_pm') if stats.get('start_fat_pm') is not None else stats.get('start_fat_am')
+        if goals.get('fat_pct_final') is not None and end_fat_goal is not None:
+            start_f = start_fat_goal
+            end_f = end_fat_goal
             goal_f = goals['fat_pct_final']
             total_drop = (start_f - goal_f) if (start_f is not None and goal_f is not None) else None
             achieved = (start_f - end_f) if (start_f is not None and end_f is not None) else None
             f_bar = _progress_bar(current=end_f, target_delta=abs(total_drop) if total_drop is not None else None, achieved_delta=abs(achieved) if achieved is not None else 0, inverse=True)
-            md += f"- 體脂率目標（AM）：{start_f:.1f}% → {goal_f:.1f}%  | 目前 {end_f:.1f}%  | 進度 {f_bar}  \n"
+            fat_label = "PM 趨勢基準" if stats.get('end_fat_pm') is not None else "AM"
+            md += f"- 體脂率目標（{fat_label}）：{start_f:.1f}% → {goal_f:.1f}%  | 目前 {end_f:.1f}%  | 進度 {f_bar}  \n"
         # 目標 ETA（近28天趨勢估算）
         # 動態方法標籤
         _method = (eta_config or {}).get('method', 'regress28')
@@ -1984,7 +2016,8 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
                 method = (eta_config or {}).get('method', 'regress28')
                 eta_f = _compute_eta(wdf_all=df_sorted, wdf_slice=df_sorted, metric='fatpct', target=gf, scope=scope, method=method)
                 if eta_f:
-                    md += f"- 體脂率達標 ETA（AM）：~{eta_f['weeks']:.1f} 週（{eta_f['date']}）  \n"
+                    fat_eta_label = "PM 趨勢基準" if stats.get('end_fat_pm') is not None else "AM"
+                    md += f"- 體脂率達標 ETA（{fat_eta_label}）：~{eta_f['weeks']:.1f} 週（{eta_f['date']}）  \n"
                     printed_any = True
             if not printed_any:
                 md += f"- 資料趨勢不足（{_method_label}），暫無 ETA 可供參考  \n"
