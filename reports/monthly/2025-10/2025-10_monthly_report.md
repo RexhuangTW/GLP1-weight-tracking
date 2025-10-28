@@ -42,6 +42,8 @@
 
 ![組成總覽](2025-10_composition_overview.png)
 
+![體重組成變化(kg)](2025-10_weight_composition_kg.png)
+
 ![體重趨勢](2025-10_weight_trend.png)
 ![體脂率趨勢](2025-10_bodyfat_trend.png)
 ![內臟脂肪趨勢](2025-10_visceral_fat_trend.png)
