@@ -1104,15 +1104,19 @@ def generate_simulation_forecast(df: pd.DataFrame, out_dir: str, prefix: str = "
             future_reduction = current_visceral * remaining_reduction_rate * (future_weeks / 20)
             predicted_visceral = max(8, current_visceral - future_reduction)
         
-        # 5) BMR 預測 (代謝適應)
+        # 5) BMR 預測 (代謝適應) - 修正：代謝恢復有上限，不會完全抵消抑制
         base_bmr = 10 * predicted_weight + 6.25 * 175 - 5 * 32 + 5  # Mifflin-St Jeor (假設男性)
-        metabolic_adaptation = bmr_reduction_per_kg * total_weight_loss
-        if total_weeks_from_start > 10:  # 代謝活化期回補
-            recovery_weeks = total_weeks_from_start - 10
-            metabolic_recovery = bmr_recovery_rate * total_weight_loss * min(1, recovery_weeks / 12)
-            metabolic_adaptation -= metabolic_recovery
+        metabolic_suppression = bmr_reduction_per_kg * total_weight_loss
         
-        adjusted_bmr = base_bmr - metabolic_adaptation
+        # 代謝恢復：從第10週開始，但最多只能恢復60%的抑制效果
+        metabolic_recovery = 0
+        if total_weeks_from_start > 10:
+            recovery_weeks = total_weeks_from_start - 10
+            recovery_progress = min(1, recovery_weeks / 20)  # 20週達到最大恢復
+            max_recovery = metabolic_suppression * 0.60  # 最多恢復60%
+            metabolic_recovery = max_recovery * recovery_progress
+        
+        adjusted_bmr = base_bmr - metabolic_suppression + metabolic_recovery
         
         predictions.append({
             'date': future_date,
