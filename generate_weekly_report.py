@@ -662,37 +662,48 @@ def make_charts(wdf, out_dir, prefix, kpi=None, is_week=False, show_ma: bool = F
 
 def make_overview_charts(wdf: pd.DataFrame, out_dir: str, prefix: str = "overview") -> str:
     """
-    輸出單張整合圖：左側體重+內臟脂肪+劑量，右上體脂肪量vs骨骼肌重量，右下體脂率vs骨骼肌率
+    輸出單張整合圖：直接使用 CSV 原始數據，不分早上/晚上
+    左側體重+內臟脂肪+劑量，右上體脂肪量vs骨骼肌重量，右下體脂率vs骨骼肌率
     回傳整合圖檔路徑
     """
     import matplotlib.gridspec as gridspec
     from matplotlib.dates import DateFormatter
     
-    wdf_sorted = wdf.sort_values("日期")
-    if wdf_sorted.empty:
+    # 直接讀取原始 CSV 數據
+    try:
+        raw_df = pd.read_csv('BodyComposition_202507-202510.csv')
+        raw_df['測量日期'] = pd.to_datetime(raw_df['測量日期'])
+        raw_df = raw_df.sort_values('測量日期')
+    except Exception as e:
+        print(f"無法讀取 CSV 文件: {e}")
+        return ""
+    
+    if raw_df.empty:
         return ""
     
     # 建立 2x2 格局：左側佔兩列高，右側兩個小圖
-    fig = plt.figure(figsize=(16, 6))
-    gs = gridspec.GridSpec(nrows=2, ncols=2, width_ratios=[2, 1])
+    fig = plt.figure(figsize=(20, 12))
+    gs = gridspec.GridSpec(nrows=2, ncols=2, width_ratios=[2, 1], hspace=0.3, wspace=0.3)
     
     # ================ 左側大圖：體重 + 內臟脂肪 + 劑量標記 ================
     ax_left = fig.add_subplot(gs[:, 0])  # 佔據左側兩列
     
     # 主 y 軸：體重
-    dates = wdf_sorted["日期"]
-    weight_am = wdf_sorted.get("早上體重 (kg)")
-    if weight_am is not None and not weight_am.dropna().empty:
-        ax_left.plot(dates, weight_am, color='blue', linewidth=1, marker='o', markersize=3, label='體重(kg)')
+    dates = raw_df["測量日期"]
+    weight = raw_df.get("體重(kg)")
+    if weight is not None and not weight.dropna().empty:
+        # 只畫有效的數據點
+        weight_clean = weight.dropna()
+        dates_clean = dates.loc[weight_clean.index]
+        ax_left.plot(dates_clean, weight_clean, color='blue', linewidth=1, marker='o', markersize=3, label='體重(kg)')
         
         # 線性趨勢線
-        weight_clean = weight_am.dropna()
         if len(weight_clean) >= 2:
-            dates_clean = dates.loc[weight_clean.index]
             x_numeric = [(d - dates_clean.iloc[0]).days for d in dates_clean]
             coeffs = np.polyfit(x_numeric, weight_clean, 1)
-            trend_y = np.polyval(coeffs, [(d - dates_clean.iloc[0]).days for d in dates])
-            ax_left.plot(dates, trend_y, color='lightblue', alpha=0.6, linewidth=2, label='體重趨勢線')
+            # 趨勢線覆蓋整個日期範圍
+            trend_y = np.polyval(coeffs, [(d - dates_clean.iloc[0]).days for d in dates_clean])
+            ax_left.plot(dates_clean, trend_y, color='lightblue', alpha=0.6, linewidth=2, label='體重趨勢線')
     
     ax_left.set_xlabel("日期")
     ax_left.set_ylabel("體重(kg)", color='blue')
@@ -700,21 +711,24 @@ def make_overview_charts(wdf: pd.DataFrame, out_dir: str, prefix: str = "overvie
     ax_left.grid(True, alpha=0.2)
     
     # 次 y 軸：內臟脂肪
-    visceral_am = wdf_sorted.get("早上內臟脂肪")
-    if visceral_am is not None and not visceral_am.dropna().empty:
+    visceral = raw_df.get("內臟脂肪程度")
+    if visceral is not None and not visceral.dropna().empty:
         ax_right = ax_left.twinx()
-        ax_right.plot(dates, visceral_am, color='red', linewidth=1, marker='s', markersize=3, label='內臟脂肪')
+        # 只畫有效的數據點
+        visceral_clean = visceral.dropna()
+        visceral_dates = dates.loc[visceral_clean.index]
+        ax_right.plot(visceral_dates, visceral_clean, color='red', linewidth=1, marker='s', markersize=3, label='內臟脂肪')
         ax_right.set_ylabel("內臟脂肪", color='red')
         ax_right.tick_params(axis='y', labelcolor='red')
     
     # 劑量標記
-    dosage_col = wdf_sorted.get("藥物劑量 (mg)")
+    dosage_col = raw_df.get("藥物劑量")
     if dosage_col is not None and not dosage_col.dropna().empty:
         dosage_markers = []
         for idx, dose in dosage_col.items():
             if pd.notna(dose):
                 date_val = dates.loc[idx]
-                weight_val = weight_am.loc[idx] if weight_am is not None and pd.notna(weight_am.loc[idx]) else None
+                weight_val = weight.loc[idx] if weight is not None and pd.notna(weight.loc[idx]) else None
                 if weight_val is not None:
                     if dose == 2.5:
                         ax_left.scatter(date_val, weight_val, color='green', marker='o', s=50, zorder=5)
@@ -754,32 +768,43 @@ def make_overview_charts(wdf: pd.DataFrame, out_dir: str, prefix: str = "overvie
     fat_kg = None
     muscle_kg = None
     
-    # 先檢查是否有直接的欄位
-    if "早上脂肪重量 (kg)" in wdf_sorted.columns:
-        fat_kg = wdf_sorted["早上脂肪重量 (kg)"]
-    elif weight_am is not None and "早上體脂 (%)" in wdf_sorted.columns:
+    # 檢查脂肪量欄位
+    if "體脂肪量(kg)" in raw_df.columns:
+        fat_kg = raw_df["體脂肪量(kg)"]
+    elif weight is not None and "體脂肪(%)" in raw_df.columns:
         # 用體重 * 體脂率 / 100 計算
-        fat_pct = wdf_sorted["早上體脂 (%)"]
-        fat_kg = (weight_am * fat_pct / 100.0).dropna()
+        fat_pct = raw_df["體脂肪(%)"]
+        fat_kg = (weight * fat_pct / 100.0)
     
-    if "早上骨骼肌重量 (kg)" in wdf_sorted.columns:
-        muscle_kg = wdf_sorted["早上骨骼肌重量 (kg)"]
-    elif weight_am is not None and "早上骨骼肌 (%)" in wdf_sorted.columns:
+    # 檢查骨骼肌重量欄位
+    if "骨骼肌重量(kg)" in raw_df.columns:
+        muscle_kg = raw_df["骨骼肌重量(kg)"]
+    elif weight is not None and "骨骼肌(%)" in raw_df.columns:
         # 用體重 * 骨骼肌率 / 100 計算
-        muscle_pct = wdf_sorted["早上骨骼肌 (%)"]
-        muscle_kg = (weight_am * muscle_pct / 100.0).dropna()
+        muscle_pct = raw_df["骨骼肌(%)"]
+        muscle_kg = (weight * muscle_pct / 100.0)
     
-    if fat_kg is not None and not fat_kg.empty:
-        ax_top_right.plot(dates, fat_kg, color='green', linewidth=1, marker='o', markersize=2, label='體脂肪量')
+    if fat_kg is not None and not fat_kg.dropna().empty:
+        # 只畫有效的數據點
+        fat_clean = fat_kg.dropna()
+        fat_dates = dates.loc[fat_clean.index]
+        ax_top_right.plot(fat_dates, fat_clean, color='green', linewidth=1, marker='o', markersize=2, label='體脂肪量')
         # 7日移動平均
-        fat_ma = fat_kg.rolling(window=7, min_periods=3).mean()
-        ax_top_right.plot(dates, fat_ma, color='green', linestyle=':', linewidth=2, alpha=0.7, label='體脂肪7日均線')
+        fat_ma = fat_kg.rolling(window=7, min_periods=3).mean().dropna()
+        if not fat_ma.empty:
+            fat_ma_dates = dates.loc[fat_ma.index]
+            ax_top_right.plot(fat_ma_dates, fat_ma, color='green', linestyle=':', linewidth=2, alpha=0.7, label='體脂肪7日均線')
     
-    if muscle_kg is not None and not muscle_kg.empty:
-        ax_top_right.plot(dates, muscle_kg, color='orange', linewidth=1, marker='s', markersize=2, label='骨骼肌重量')
+    if muscle_kg is not None and not muscle_kg.dropna().empty:
+        # 只畫有效的數據點
+        muscle_clean = muscle_kg.dropna()
+        muscle_dates = dates.loc[muscle_clean.index]
+        ax_top_right.plot(muscle_dates, muscle_clean, color='orange', linewidth=1, marker='s', markersize=2, label='骨骼肌重量')
         # 7日移動平均
-        muscle_ma = muscle_kg.rolling(window=7, min_periods=3).mean()
-        ax_top_right.plot(dates, muscle_ma, color='orange', linestyle=':', linewidth=2, alpha=0.7, label='骨骼肌7日均線')
+        muscle_ma = muscle_kg.rolling(window=7, min_periods=3).mean().dropna()
+        if not muscle_ma.empty:
+            muscle_ma_dates = dates.loc[muscle_ma.index]
+            ax_top_right.plot(muscle_ma_dates, muscle_ma, color='orange', linestyle=':', linewidth=2, alpha=0.7, label='骨骼肌7日均線')
     
     ax_top_right.set_xlabel("日期")
     ax_top_right.set_ylabel("kg")
@@ -789,20 +814,30 @@ def make_overview_charts(wdf: pd.DataFrame, out_dir: str, prefix: str = "overvie
     # ================ 右下圖：體脂率(%) vs 骨骼肌率(%) ================
     ax_bottom_right = fig.add_subplot(gs[1, 1])
     
-    fat_pct = wdf_sorted.get("早上體脂 (%)")
-    muscle_pct = wdf_sorted.get("早上骨骼肌 (%)")
+    fat_pct = raw_df.get("體脂肪(%)")
+    muscle_pct = raw_df.get("骨骼肌(%)")
     
     if fat_pct is not None and not fat_pct.dropna().empty:
-        ax_bottom_right.plot(dates, fat_pct, color='green', linewidth=1, marker='o', markersize=2, label='體脂率')
+        # 只畫有效的數據點
+        fat_pct_clean = fat_pct.dropna()
+        fat_pct_dates = dates.loc[fat_pct_clean.index]
+        ax_bottom_right.plot(fat_pct_dates, fat_pct_clean, color='green', linewidth=1, marker='o', markersize=2, label='體脂率')
         # 7日移動平均
-        fat_pct_ma = fat_pct.rolling(window=7, min_periods=3).mean()
-        ax_bottom_right.plot(dates, fat_pct_ma, color='green', linestyle=':', linewidth=2, alpha=0.7, label='體脂7日均線')
+        fat_pct_ma = fat_pct.rolling(window=7, min_periods=3).mean().dropna()
+        if not fat_pct_ma.empty:
+            fat_pct_ma_dates = dates.loc[fat_pct_ma.index]
+            ax_bottom_right.plot(fat_pct_ma_dates, fat_pct_ma, color='green', linestyle=':', linewidth=2, alpha=0.7, label='體脂7日均線')
     
     if muscle_pct is not None and not muscle_pct.dropna().empty:
-        ax_bottom_right.plot(dates, muscle_pct, color='orange', linewidth=1, marker='s', markersize=2, label='骨骼肌率')
+        # 只畫有效的數據點
+        muscle_pct_clean = muscle_pct.dropna()
+        muscle_pct_dates = dates.loc[muscle_pct_clean.index]
+        ax_bottom_right.plot(muscle_pct_dates, muscle_pct_clean, color='orange', linewidth=1, marker='s', markersize=2, label='骨骼肌率')
         # 7日移動平均
-        muscle_pct_ma = muscle_pct.rolling(window=7, min_periods=3).mean()
-        ax_bottom_right.plot(dates, muscle_pct_ma, color='orange', linestyle=':', linewidth=2, alpha=0.7, label='骨骼肌7日均線')
+        muscle_pct_ma = muscle_pct.rolling(window=7, min_periods=3).mean().dropna()
+        if not muscle_pct_ma.empty:
+            muscle_pct_ma_dates = dates.loc[muscle_pct_ma.index]
+            ax_bottom_right.plot(muscle_pct_ma_dates, muscle_pct_ma, color='orange', linestyle=':', linewidth=2, alpha=0.7, label='骨骼肌7日均線')
     
     ax_bottom_right.set_xlabel("日期")
     ax_bottom_right.set_ylabel("%")
@@ -823,6 +858,91 @@ def make_overview_charts(wdf: pd.DataFrame, out_dir: str, prefix: str = "overvie
     plt.close()
     
     return overview_png
+
+def make_combined_kg_chart(wdf: pd.DataFrame, out_dir: str, prefix: str = "combined") -> str:
+    """
+    生成體重、體脂重量、骨骼肌重量合併圖表（全部以 kg 為單位）
+    直接使用 CSV 原始數據
+    """
+    from matplotlib.dates import DateFormatter
+    
+    # 直接讀取原始 CSV 數據
+    try:
+        raw_df = pd.read_csv('BodyComposition_202507-202510.csv')
+        raw_df['測量日期'] = pd.to_datetime(raw_df['測量日期'])
+        raw_df = raw_df.sort_values('測量日期')
+    except Exception as e:
+        print(f"無法讀取 CSV 文件: {e}")
+        return ""
+    
+    if raw_df.empty:
+        return ""
+    
+    # 準備數據
+    dates = raw_df["測量日期"]
+    weight = raw_df.get("體重(kg)")
+    fat_kg = raw_df.get("體脂肪量(kg)")
+    muscle_kg = raw_df.get("骨骼肌重量(kg)")
+    
+    # 創建圖表
+    fig, ax = plt.subplots(figsize=(16, 8))
+    
+    # 繪製體重
+    if weight is not None and not weight.dropna().empty:
+        weight_clean = weight.dropna()
+        weight_dates = dates.loc[weight_clean.index]
+        ax.plot(weight_dates, weight_clean, color='blue', linewidth=2, marker='o', markersize=4, label='體重 (kg)', alpha=0.8)
+        
+        # 7日移動平均
+        weight_ma = weight.rolling(window=7, min_periods=3).mean().dropna()
+        if not weight_ma.empty:
+            weight_ma_dates = dates.loc[weight_ma.index]
+            ax.plot(weight_ma_dates, weight_ma, color='darkblue', linestyle='--', linewidth=2, alpha=0.6, label='體重7日均線')
+    
+    # 繪製體脂重量
+    if fat_kg is not None and not fat_kg.dropna().empty:
+        fat_clean = fat_kg.dropna()
+        fat_dates = dates.loc[fat_clean.index]
+        ax.plot(fat_dates, fat_clean, color='red', linewidth=2, marker='s', markersize=4, label='體脂重量 (kg)', alpha=0.8)
+        
+        # 7日移動平均
+        fat_ma = fat_kg.rolling(window=7, min_periods=3).mean().dropna()
+        if not fat_ma.empty:
+            fat_ma_dates = dates.loc[fat_ma.index]
+            ax.plot(fat_ma_dates, fat_ma, color='darkred', linestyle='--', linewidth=2, alpha=0.6, label='體脂7日均線')
+    
+    # 繪製骨骼肌重量
+    if muscle_kg is not None and not muscle_kg.dropna().empty:
+        muscle_clean = muscle_kg.dropna()
+        muscle_dates = dates.loc[muscle_clean.index]
+        ax.plot(muscle_dates, muscle_clean, color='green', linewidth=2, marker='^', markersize=4, label='骨骼肌重量 (kg)', alpha=0.8)
+        
+        # 7日移動平均
+        muscle_ma = muscle_kg.rolling(window=7, min_periods=3).mean().dropna()
+        if not muscle_ma.empty:
+            muscle_ma_dates = dates.loc[muscle_ma.index]
+            ax.plot(muscle_ma_dates, muscle_ma, color='darkgreen', linestyle='--', linewidth=2, alpha=0.6, label='骨骼肌7日均線')
+    
+    # 圖表設定
+    ax.set_xlabel("日期", fontsize=12)
+    ax.set_ylabel("重量 (kg)", fontsize=12)
+    ax.set_title("體重、體脂重量、骨骼肌重量變化趨勢", fontsize=14, fontweight='bold')
+    ax.legend(fontsize=11, loc='best')
+    ax.grid(True, alpha=0.3)
+    
+    # 格式化日期軸
+    date_formatter = DateFormatter('%Y/%m/%d')
+    ax.xaxis.set_major_formatter(date_formatter)
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right")
+    
+    plt.tight_layout()
+    
+    # 儲存圖表
+    combined_png = os.path.join(out_dir, f"{prefix}_weight_composition_kg.png")
+    fig.savefig(combined_png, dpi=150, bbox_inches="tight")
+    plt.close()
+    
+    return combined_png
 
 # ---- Composition quality helper ----
 def compute_quality_ratio(wdf, days: int = 28):
@@ -1443,7 +1563,7 @@ def compute_stats(wdf):
         stats["avg_water"] = None
     return stats
 
-def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle, out_md_path, week_tag, start_date, end_date, kpi_period_label="本週", goals: dict | None = None, eta_config: dict | None = None, kpi_override: dict | None = None, stats_period_label: str = "本週", overview_png: str = None):
+def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle, out_md_path, week_tag, start_date, end_date, kpi_period_label="本週", goals: dict | None = None, eta_config: dict | None = None, kpi_override: dict | None = None, stats_period_label: str = "本週", overview_png: str = None, combined_kg_png: str = None):
     # 基本表格
     table_cols = ["日期","早上體重 (kg)","晚上體重 (kg)","早上體脂 (%)","晚上體脂 (%)"]
     if '早上內臟脂肪' in wdf.columns and '晚上內臟脂肪' in wdf.columns:
@@ -1469,6 +1589,10 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
     # 添加綜觀佈局整合圖
     if overview_png and os.path.exists(overview_png):
         charts_section += f"![組成總覽]({os.path.basename(overview_png)})\n\n"
+    
+    # 添加體重、體脂、骨骼肌合併圖表
+    if combined_kg_png and os.path.exists(combined_kg_png):
+        charts_section += f"![體重組成變化(kg)]({os.path.basename(combined_kg_png)})\n\n"
     
     charts_section += (
         f"![體重趨勢]({os.path.basename(png_weight)})\n"
@@ -1815,6 +1939,9 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
     # 產生綜觀佈局整合圖
     overview_png = make_overview_charts(df_sorted, out_dir, prefix)
     
+    # 產生體重、體脂、骨骼肌合併圖表（kg）
+    combined_kg_png = make_combined_kg_chart(df_sorted, out_dir, prefix)
+    
     # 計算週次
     total_days = len(df_sorted)
     total_weeks = (total_days + 6) // 7  # 向上取整
@@ -1881,6 +2008,10 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
     # 添加綜觀佈局整合圖
     if overview_png and os.path.exists(overview_png):
         charts_section += f"![組成總覽]({os.path.basename(overview_png)})\n\n"
+    
+    # 添加體重、體脂、骨骼肌合併圖表
+    if combined_kg_png and os.path.exists(combined_kg_png):
+        charts_section += f"![體重組成變化(kg)]({os.path.basename(combined_kg_png)})\n\n"
     
     charts_section += (
         f"![體重趨勢]({os.path.basename(weight_png)})\n"
@@ -2404,6 +2535,9 @@ def main():
         
         # 產生月報綜觀佈局整合圖
         overview_png = make_overview_charts(wdf, month_dir, f"{ym_tag}")
+        
+        # 產生體重、體脂、骨骼肌合併圖表（kg）
+        combined_kg_png = make_combined_kg_chart(wdf, month_dir, f"{ym_tag}")
 
         # 產出 MD（沿用週報版樣式，標題與文案換成月報）
         md_path = os.path.join(month_dir, f"{ym_tag}_monthly_report.md")
@@ -2432,6 +2566,7 @@ def main():
             kpi_override=month_kpi,
             stats_period_label="本月",
             overview_png=overview_png,
+            combined_kg_png=combined_kg_png,
         )
         print("✅ 月度報告已完成輸出")
         print("Monthly MD:", md_path)
@@ -2456,6 +2591,9 @@ def main():
     
     # 產生週報綜觀佈局整合圖
     overview_png = make_overview_charts(wdf, week_reports_dir, week_tag)
+    
+    # 產生體重、體脂、骨骼肌合併圖表（kg）
+    combined_kg_png = make_combined_kg_chart(wdf, week_reports_dir, week_tag)
 
     weekly_md = os.path.join(week_reports_dir, f"{week_tag}_weekly_report.md")
     # 將長期目標（若 CLI 有提供）帶入週報，顯示 ETA
@@ -2465,7 +2603,7 @@ def main():
     }
     if weekly_goals['weight_final'] is None and weekly_goals['fat_pct_final'] is None:
         weekly_goals = None
-    make_markdown(wdf, stats, weight_png, bodyfat_png, visceral_png, muscle_png, weekly_md, week_tag, start_date, end_date, kpi_period_label="本週", goals=weekly_goals, eta_config={'scope': args.eta_scope, 'method': args.eta_method}, overview_png=overview_png)
+    make_markdown(wdf, stats, weight_png, bodyfat_png, visceral_png, muscle_png, weekly_md, week_tag, start_date, end_date, kpi_period_label="本週", goals=weekly_goals, eta_config={'scope': args.eta_scope, 'method': args.eta_method}, overview_png=overview_png, combined_kg_png=combined_kg_png)
 
     print("✅ 已完成輸出")
     print("Weekly Excel:", weekly_xlsx)
