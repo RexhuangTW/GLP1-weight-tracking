@@ -1359,8 +1359,9 @@ def generate_simulation_forecast(df: pd.DataFrame, out_dir: str, prefix: str = "
 - **權重調整**：{calibration_suggestion}
 - **預測微調**：未來1-2個月的預測可能需要根據實際表現調整
 
-### 📊 週進度對比圖表參考
-*詳細的實際 vs 預測對比圖表請參考：`simulation_v2_clinical_forecast.png`*
+### 📊 預測趨勢圖表
+
+![v2 臨床預測圖表](simulation_v2_clinical_forecast.png)
 
 ---
 
