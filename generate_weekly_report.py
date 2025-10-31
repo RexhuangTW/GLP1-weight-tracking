@@ -660,6 +660,61 @@ def make_charts(wdf, out_dir, prefix, kpi=None, is_week=False, show_ma: bool = F
 
     return weight_png, bodyfat_png, visceral_png, muscle_png
 
+def make_body_composition_kg_chart(wdf, out_dir, prefix, show_ma: bool = False):
+    """
+    生成體脂重量(kg)和骨骼肌重量(kg)的組合折線圖
+    """
+    wdf_sorted = wdf.sort_values("日期")
+    
+    # 檢查是否有必要的欄位
+    has_fat_weight = '早上脂肪重量 (kg)' in wdf_sorted.columns or '晚上脂肪重量 (kg)' in wdf_sorted.columns
+    has_muscle_weight = '早上骨骼肌重量 (kg)' in wdf_sorted.columns or '晚上骨骼肌重量 (kg)' in wdf_sorted.columns
+    
+    if not (has_fat_weight and has_muscle_weight):
+        return None
+    
+    plt.figure(figsize=(12, 6))
+    
+    # 繪製體脂重量
+    if '早上脂肪重量 (kg)' in wdf_sorted.columns:
+        plt.plot(wdf_sorted["日期"], wdf_sorted["早上脂肪重量 (kg)"], 
+                marker="o", label="早上脂肪重量", color='#ff6b6b', linewidth=2)
+    if '晚上脂肪重量 (kg)' in wdf_sorted.columns:
+        plt.plot(wdf_sorted["日期"], wdf_sorted["晚上脂肪重量 (kg)"], 
+                marker="s", label="晚上脂肪重量", color='#ff8787', linewidth=2, alpha=0.7)
+    
+    # 繪製骨骼肌重量
+    if '早上骨骼肌重量 (kg)' in wdf_sorted.columns:
+        plt.plot(wdf_sorted["日期"], wdf_sorted["早上骨骼肌重量 (kg)"], 
+                marker="o", label="早上骨骼肌重量", color='#2ca02c', linewidth=2)
+    if '晚上骨骼肌重量 (kg)' in wdf_sorted.columns:
+        plt.plot(wdf_sorted["日期"], wdf_sorted["晚上骨骼肌重量 (kg)"], 
+                marker="s", label="晚上骨骼肌重量", color='#8bc34a', linewidth=2, alpha=0.7)
+    
+    # 7日移動平均
+    if show_ma:
+        if "早上脂肪重量 (kg)" in wdf_sorted.columns:
+            ma_fat = wdf_sorted["早上脂肪重量 (kg)"].rolling(window=7, min_periods=3).mean()
+            plt.plot(wdf_sorted["日期"], ma_fat, color="#ff6b6b", linestyle=":", 
+                    linewidth=2.5, alpha=0.9, label="脂肪7日均線(AM)")
+        if "早上骨骼肌重量 (kg)" in wdf_sorted.columns:
+            ma_muscle = wdf_sorted["早上骨骼肌重量 (kg)"].rolling(window=7, min_periods=3).mean()
+            plt.plot(wdf_sorted["日期"], ma_muscle, color="#2ca02c", linestyle=":", 
+                    linewidth=2.5, alpha=0.9, label="骨骼肌7日均線(AM)")
+    
+    plt.xlabel("日期", fontsize=12)
+    plt.ylabel("重量 (kg)", fontsize=12)
+    plt.title("身體組成趨勢 - 脂肪重量 vs 骨骼肌重量", fontsize=14, fontweight='bold')
+    plt.legend(loc='best', fontsize=10)
+    plt.grid(True, alpha=0.3)
+    plt.xticks(rotation=30)
+    
+    composition_png = os.path.join(out_dir, f"{prefix}_body_composition_kg.png")
+    plt.savefig(composition_png, dpi=150, bbox_inches="tight")
+    plt.close()
+    
+    return composition_png
+
 def make_overview_charts(wdf: pd.DataFrame, out_dir: str, prefix: str = "overview") -> str:
     """
     輸出單張整合圖：直接使用 CSV 原始數據，不分早上/晚上
@@ -2200,7 +2255,7 @@ def compute_stats(wdf):
         stats["avg_water"] = None
     return stats
 
-def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle, out_md_path, week_tag, start_date, end_date, kpi_period_label="本週", goals: dict | None = None, eta_config: dict | None = None, kpi_override: dict | None = None, stats_period_label: str = "本週", overview_png: str = None, combined_kg_png: str = None):
+def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle, out_md_path, week_tag, start_date, end_date, kpi_period_label="本週", goals: dict | None = None, eta_config: dict | None = None, kpi_override: dict | None = None, stats_period_label: str = "本週", overview_png: str = None, combined_kg_png: str = None, composition_kg_png: str = None):
     # 基本表格
     table_cols = ["日期","早上體重 (kg)","晚上體重 (kg)","早上體脂 (%)","晚上體脂 (%)"]
     if '早上內臟脂肪' in wdf.columns and '晚上內臟脂肪' in wdf.columns:
@@ -2230,6 +2285,10 @@ def make_markdown(wdf, stats, png_weight, png_bodyfat, png_visceral, png_muscle,
     # 添加體重、體脂、骨骼肌合併圖表
     if combined_kg_png and os.path.exists(combined_kg_png):
         charts_section += f"![體重組成變化(kg)]({os.path.basename(combined_kg_png)})\n\n"
+    
+    # 添加身體組成重量圖表（體脂kg vs 骨骼肌kg）
+    if composition_kg_png and os.path.exists(composition_kg_png):
+        charts_section += f"![身體組成趨勢]({os.path.basename(composition_kg_png)})\n\n"
     
     charts_section += (
         f"![體重趨勢]({os.path.basename(png_weight)})\n"
@@ -2573,6 +2632,9 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
             summary_kpi['fat_pct_target_end'] = goals['fat_pct_final'] if start_fat is not None else None
     weight_png, bodyfat_png, visceral_png, muscle_png = make_charts(df_sorted, out_dir, prefix=prefix, kpi=summary_kpi, is_week=bool(summary_kpi), show_ma=True, show_targets=show_targets)
     
+    # 產生身體組成重量圖表（體脂kg vs 骨骼肌kg）
+    composition_kg_png = make_body_composition_kg_chart(df_sorted, out_dir, prefix, show_ma=True)
+    
     # 產生綜觀佈局整合圖
     overview_png = make_overview_charts(df_sorted, out_dir, prefix)
     
@@ -2652,6 +2714,10 @@ def make_summary_report(df, out_dir, prefix="summary", goals: dict | None = None
     # 添加體重、體脂、骨骼肌合併圖表
     if combined_kg_png and os.path.exists(combined_kg_png):
         charts_section += f"![體重組成變化(kg)]({os.path.basename(combined_kg_png)})\n\n"
+    
+    # 添加身體組成重量圖表（體脂kg vs 骨骼肌kg）
+    if composition_kg_png and os.path.exists(composition_kg_png):
+        charts_section += f"![身體組成趨勢]({os.path.basename(composition_kg_png)})\n\n"
     
     # 添加 v2 模型預測圖表
     if forecast_png and os.path.exists(forecast_png):
@@ -3196,6 +3262,9 @@ def main():
         chart_show_targets = True if args.show_target_lines else (not args.no_target_lines)
         weight_png, bodyfat_png, visceral_png, muscle_png = make_charts(wdf, month_dir, prefix=f"{ym_tag}", kpi=month_kpi, is_week=True, show_ma=True, show_targets=chart_show_targets)
         
+        # 產生身體組成重量圖表（體脂kg vs 骨骼肌kg）
+        composition_kg_png = make_body_composition_kg_chart(wdf, month_dir, f"{ym_tag}", show_ma=True)
+        
         # 產生月報綜觀佈局整合圖
         overview_png = make_overview_charts(wdf, month_dir, f"{ym_tag}")
         
@@ -3230,6 +3299,7 @@ def main():
             stats_period_label="本月",
             overview_png=overview_png,
             combined_kg_png=combined_kg_png,
+            composition_kg_png=composition_kg_png,
         )
         print("✅ 月度報告已完成輸出")
         print("Monthly MD:", md_path)
@@ -3252,6 +3322,9 @@ def main():
     chart_show_targets = True if args.show_target_lines else (not args.no_target_lines)
     weight_png, bodyfat_png, visceral_png, muscle_png = make_charts(wdf, week_reports_dir, prefix=week_tag, kpi=kpi, is_week=True, show_ma=True, show_targets=chart_show_targets)
     
+    # 產生身體組成重量圖表（體脂kg vs 骨骼肌kg）
+    composition_kg_png = make_body_composition_kg_chart(wdf, week_reports_dir, week_tag, show_ma=True)
+    
     # 產生週報綜觀佈局整合圖
     overview_png = make_overview_charts(wdf, week_reports_dir, week_tag)
     
@@ -3266,7 +3339,7 @@ def main():
     }
     if weekly_goals['weight_final'] is None and weekly_goals['fat_pct_final'] is None:
         weekly_goals = None
-    make_markdown(wdf, stats, weight_png, bodyfat_png, visceral_png, muscle_png, weekly_md, week_tag, start_date, end_date, kpi_period_label="本週", goals=weekly_goals, eta_config={'scope': args.eta_scope, 'method': args.eta_method}, overview_png=overview_png, combined_kg_png=combined_kg_png)
+    make_markdown(wdf, stats, weight_png, bodyfat_png, visceral_png, muscle_png, weekly_md, week_tag, start_date, end_date, kpi_period_label="本週", goals=weekly_goals, eta_config={'scope': args.eta_scope, 'method': args.eta_method}, overview_png=overview_png, combined_kg_png=combined_kg_png, composition_kg_png=composition_kg_png)
 
     print("✅ 已完成輸出")
     print("Weekly Excel:", weekly_xlsx)
