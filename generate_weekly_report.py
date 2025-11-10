@@ -726,7 +726,7 @@ def make_overview_charts(wdf: pd.DataFrame, out_dir: str, prefix: str = "overvie
     
     # 直接讀取原始 CSV 數據
     try:
-        raw_df = pd.read_csv('BodyComposition_202507-202510.csv')
+        raw_df = pd.read_csv('BodyComposition_202507-202511.csv')
         raw_df['測量日期'] = pd.to_datetime(raw_df['測量日期'])
         raw_df = raw_df.sort_values('測量日期')
     except Exception as e:
@@ -923,7 +923,7 @@ def make_combined_kg_chart(wdf: pd.DataFrame, out_dir: str, prefix: str = "combi
     
     # 直接讀取原始 CSV 數據
     try:
-        raw_df = pd.read_csv('BodyComposition_202507-202510.csv')
+        raw_df = pd.read_csv('BodyComposition_202507-202511.csv')
         raw_df['測量日期'] = pd.to_datetime(raw_df['測量日期'])
         raw_df = raw_df.sort_values('測量日期')
     except Exception as e:
@@ -1015,7 +1015,7 @@ def generate_simulation_forecast(df: pd.DataFrame, out_dir: str, prefix: str = "
     
     # 讀取原始 CSV 數據來獲取準確的初始值
     try:
-        raw_df = pd.read_csv('BodyComposition_202507-202510.csv')
+        raw_df = pd.read_csv('BodyComposition_202507-202511.csv')
         raw_df['測量日期'] = pd.to_datetime(raw_df['測量日期'])
         raw_df = raw_df.sort_values('測量日期')
         
