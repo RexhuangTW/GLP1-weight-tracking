@@ -203,6 +203,15 @@
             font-weight: 600;
             color: var(--text-light);
             transition: all 0.2s;
+            .active {
+                background: var(--text-main);
+                color: white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+        }
+        
+        .tab-btn:hover:not(.active) {
+            background-color: #f3f4f6;
         }
 
         .tab-btn.active {
@@ -359,7 +368,7 @@
         <header id="dashboard">
             <div class="header-title">
                 <h2>👋 歡迎回來，Rex</h2>
-                <p>這是您目前的減重進度追蹤摘要</p>
+                <p>這是您目前的減重進度追蹤摘要 (2025/08 - 2025/11)</p>
             </div>
         </header>
 
@@ -439,19 +448,19 @@
             <div class="chart-gallery">
                 <div class="chart-box">
                     <h4>身體組成總覽</h4>
-                    <img src="reports/summary/summary_composition_overview.png" alt="組成總覽">
+                    <img src="reports/summary/summary_composition_overview.png" alt="組成總覽" onclick="window.open(this.src)">
                 </div>
                 <div class="chart-box">
                     <h4>體重組成 (脂肪 vs 肌肉 kg)</h4>
-                    <img src="reports/summary/summary_weight_composition_kg.png" alt="體重組成">
+                    <img src="reports/summary/summary_weight_composition_kg.png" alt="體重組成" onclick="window.open(this.src)">
                 </div>
                 <div class="chart-box">
                     <h4>臨床模型預測 (v2)</h4>
-                    <img src="reports/summary/summary_v2_clinical_forecast.png" alt="預測模型">
+                    <img src="reports/summary/summary_v2_clinical_forecast.png" alt="預測模型" onclick="window.open(this.src)">
                 </div>
                 <div class="chart-box">
                     <h4>內臟脂肪趨勢</h4>
-                    <img src="reports/summary/summary_visceral_fat_trend.png" alt="內臟脂肪">
+                    <img src="reports/summary/summary_visceral_fat_trend.png" alt="內臟脂肪" onclick="window.open(this.src)">
                 </div>
             </div>
         </section>
@@ -477,7 +486,7 @@
                     </div>
                     <span class="report-tag tag-summary">Summary</span>
                 </a>
-                <a href="reports/summary/summary_v2_clinical_forecast.md" class="report-link">
+                <a href="reports/summary/simulation_v2_clinical_forecast.md" class="report-link">
                     <div>
                         <div class="report-date">未來預測</div>
                         <div class="report-name">🔮 臨床預測報告 (v2)</div>
@@ -489,30 +498,42 @@
 
             <div id="tab-weekly" class="reports-container">
                 <a href="reports/2025-CW14/2025-CW14_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW14</div><div class="report-name">第 14 週週報</div></div>
+                    <div><div class="report-date">2025-CW14 (11/14-11/20)</div><div class="report-name">第 14 週週報</div></div>
                     <span class="report-tag tag-weekly">Weekly</span>
                 </a>
                 <a href="reports/2025-CW13/2025-CW13_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW13</div><div class="report-name">第 13 週週報</div></div>
+                    <div><div class="report-date">2025-CW13 (11/07-11/13)</div><div class="report-name">第 13 週週報</div></div>
                     <span class="report-tag tag-weekly">Weekly</span>
                 </a>
                 <a href="reports/2025-CW12/2025-CW12_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW12</div><div class="report-name">第 12 週週報</div></div>
+                    <div><div class="report-date">2025-CW12 (10/31-11/06)</div><div class="report-name">第 12 週週報</div></div>
                     <span class="report-tag tag-weekly">Weekly</span>
                 </a>
                 <a href="reports/2025-CW11/2025-CW11_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW11</div><div class="report-name">第 11 週週報</div></div>
+                    <div><div class="report-date">2025-CW11 (10/24-10/30)</div><div class="report-name">第 11 週週報</div></div>
                     <span class="report-tag tag-weekly">Weekly</span>
                 </a>
                 <a href="reports/2025-CW10/2025-CW10_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW10</div><div class="report-name">第 10 週週報</div></div>
+                    <div><div class="report-date">2025-CW10 (10/17-10/23)</div><div class="report-name">第 10 週週報</div></div>
                     <span class="report-tag tag-weekly">Weekly</span>
                 </a>
                 <a href="reports/2025-CW09/2025-CW09_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW09</div><div class="report-name">第 9 週週報</div></div>
+                    <div><div class="report-date">2025-CW09 (10/10-10/16)</div><div class="report-name">第 9 週週報</div></div>
                     <span class="report-tag tag-weekly">Weekly</span>
                 </a>
-                </div>
+                <a href="reports/2025-CW08/2025-CW08_weekly_report.md" class="report-link">
+                    <div><div class="report-date">2025-CW08 (10/03-10/09)</div><div class="report-name">第 8 週週報</div></div>
+                    <span class="report-tag tag-weekly">Weekly</span>
+                </a>
+                <a href="reports/2025-CW07/2025-CW07_weekly_report.md" class="report-link">
+                    <div><div class="report-date">2025-CW07 (09/26-10/02)</div><div class="report-name">第 7 週週報</div></div>
+                    <span class="report-tag tag-weekly">Weekly</span>
+                </a>
+                <a href="reports/2025-CW01/2025-CW01_weekly_report.md" class="report-link">
+                    <div><div class="report-date">2025-CW01 (08/15-08/21)</div><div class="report-name">第 1 週週報</div></div>
+                    <span class="report-tag tag-weekly">Weekly</span>
+                </a>
+            </div>
 
             <div id="tab-monthly" class="reports-container">
                 <a href="reports/monthly/2025-11/2025-11_monthly_report.md" class="report-link">
