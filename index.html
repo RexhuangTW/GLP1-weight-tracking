@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLP1 減重追蹤系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft JhengHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .stat-card h3 {
+            color: #764ba2;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .stat-change {
+            font-size: 0.9em;
+            padding: 5px 10px;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .stat-change.positive {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .stat-change.negative {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .reports-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+
+        .reports-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .tab {
+            padding: 12px 25px;
+            background: #f5f5f5;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            border-radius: 8px 8px 0 0;
+            transition: all 0.3s ease;
+        }
+
+        .tab:hover {
+            background: #e0e0e0;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .report-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .report-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 10px;
+            color: white;
+            text-decoration: none;
+            display: block;
+            transition: all 0.3s ease;
+        }
+
+        .report-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .report-card h4 {
+            font-size: 1.2em;
+            margin-bottom: 8px;
+        }
+
+        .report-card p {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+
+        .summary-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            grid-column: 1 / -1;
+            padding: 30px;
+        }
+
+        .summary-card h4 {
+            font-size: 1.5em;
+        }
+
+        .charts-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .charts-section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+
+        .chart-item img {
+            width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                flex-direction: column;
+            }
+
+            .tab {
+                border-radius: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 GLP1 減重追蹤系統</h1>
+            <p class="subtitle">追蹤期間：2025/08/15 ～ 2025/11/18（93 天）</p>
+        </header>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>體重變化 (AM)</h3>
+                <div class="stat-value">94.2 kg</div>
+                <div class="stat-change positive">▼ 14.8 kg</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>體脂率 (AM)</h3>
+                <div class="stat-value">28.0%</div>
+                <div class="stat-change positive">▼ 2.3%</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>脂肪重量 (AM)</h3>
+                <div class="stat-value">26.4 kg</div>
+                <div class="stat-change positive">▼ 6.6 kg</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>內臟脂肪 (AM)</h3>
+                <div class="stat-value">15.0</div>
+                <div class="stat-change positive">▼ 6.0</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>骨骼肌率 (AM)</h3>
+                <div class="stat-value">30.6%</div>
+                <div class="stat-change positive">▲ 1.7%</div>
+            </div>
+
+            <div class="stat-card">
+                <h3>代謝狀態</h3>
+                <div class="stat-value">穩定減脂</div>
+                <div class="stat-change positive">MF: 54</div>
+            </div>
+        </div>
+
+        <div class="reports-section">
+            <h2>📝 報告瀏覽</h2>
+            
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('summary')">總結報告</button>
+                <button class="tab" onclick="switchTab('weekly')">週報告</button>
+                <button class="tab" onclick="switchTab('monthly')">月報告</button>
+            </div>
+
+            <div id="summary" class="tab-content active">
+                <div class="report-grid">
+                    <a href="reports/summary/overall_summary_report.md" class="report-card summary-card">
+                        <h4>🎯 整體總結報告</h4>
+                        <p>完整的減重歷程分析與統計</p>
+                    </a>
+                    <a href="reports/summary/summary_v2_clinical_forecast.md" class="report-card">
+                        <h4>🔬 臨床預測報告</h4>
+                        <p>V2模型預測分析</p>
+                    </a>
+                </div>
+            </div>
+
+            <div id="weekly" class="tab-content">
+                <div class="report-grid">
+                    <a href="reports/2025-CW14/2025-CW14_weekly_report.md" class="report-card">
+                        <h4>第 14 週報告</h4>
+                        <p>2025-CW14</p>
+                    </a>
+                    <a href="reports/2025-CW13/2025-CW13_weekly_report.md" class="report-card">
+                        <h4>第 13 週報告</h4>
+                        <p>2025-CW13</p>
+                    </a>
+                    <a href="reports/2025-CW12/2025-CW12_weekly_report.md" class="report-card">
+                        <h4>第 12 週報告</h4>
+                        <p>2025-CW12</p>
+                    </a>
+                    <a href="reports/2025-CW11/2025-CW11_weekly_report.md" class="report-card">
+                        <h4>第 11 週報告</h4>
+                        <p>2025-CW11</p>
+                    </a>
+                    <a href="reports/2025-CW10/2025-CW10_weekly_report.md" class="report-card">
+                        <h4>第 10 週報告</h4>
+                        <p>2025-CW10</p>
+                    </a>
+                    <a href="reports/2025-CW09/2025-CW09_weekly_report.md" class="report-card">
+                        <h4>第 9 週報告</h4>
+                        <p>2025-CW09</p>
+                    </a>
+                    <a href="reports/2025-CW08/2025-CW08_weekly_report.md" class="report-card">
+                        <h4>第 8 週報告</h4>
+                        <p>2025-CW08</p>
+                    </a>
+                    <a href="reports/2025-CW07/2025-CW07_weekly_report.md" class="report-card">
+                        <h4>第 7 週報告</h4>
+                        <p>2025-CW07</p>
+                    </a>
+                    <a href="reports/2025-CW06/2025-CW06_weekly_report.md" class="report-card">
+                        <h4>第 6 週報告</h4>
+                        <p>2025-CW06</p>
+                    </a>
+                    <a href="reports/2025-CW05/2025-CW05_weekly_report.md" class="report-card">
+                        <h4>第 5 週報告</h4>
+                        <p>2025-CW05</p>
+                    </a>
+                    <a href="reports/2025-CW04/2025-CW04_weekly_report.md" class="report-card">
+                        <h4>第 4 週報告</h4>
+                        <p>2025-CW04</p>
+                    </a>
+                    <a href="reports/2025-CW03/2025-CW03_weekly_report.md" class="report-card">
+                        <h4>第 3 週報告</h4>
+                        <p>2025-CW03</p>
+                    </a>
+                    <a href="reports/2025-CW02/2025-CW02_weekly_report.md" class="report-card">
+                        <h4>第 2 週報告</h4>
+                        <p>2025-CW02</p>
+                    </a>
+                    <a href="reports/2025-CW01/2025-CW01_weekly_report.md" class="report-card">
+                        <h4>第 1 週報告</h4>
+                        <p>2025-CW01</p>
+                    </a>
+                </div>
+            </div>
+
+            <div id="monthly" class="tab-content">
+                <div class="report-grid">
+                    <a href="reports/monthly/2025-11/2025-11_monthly_report.md" class="report-card">
+                        <h4>📅 2025年11月</h4>
+                        <p>月度分析報告</p>
+                    </a>
+                    <a href="reports/monthly/2025-10/2025-10_monthly_report.md" class="report-card">
+                        <h4>📅 2025年10月</h4>
+                        <p>月度分析報告</p>
+                    </a>
+                    <a href="reports/monthly/2025-09/2025-09_monthly_report.md" class="report-card">
+                        <h4>📅 2025年9月</h4>
+                        <p>月度分析報告</p>
+                    </a>
+                    <a href="reports/monthly/2025-08/2025-08_monthly_report.md" class="report-card">
+                        <h4>📅 2025年8月</h4>
+                        <p>月度分析報告</p>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="charts-section">
+            <h2>📈 視覺化圖表</h2>
+            <div class="chart-grid">
+                <div class="chart-item">
+                    <h3 style="color: #667eea; margin-bottom: 10px;">組成總覽</h3>
+                    <img src="reports/summary/summary_composition_overview.png" alt="組成總覽">
+                </div>
+                <div class="chart-item">
+                    <h3 style="color: #667eea; margin-bottom: 10px;">體重組成變化</h3>
+                    <img src="reports/summary/summary_weight_composition_kg.png" alt="體重組成變化">
+                </div>
+                <div class="chart-item">
+                    <h3 style="color: #667eea; margin-bottom: 10px;">體重趨勢</h3>
+                    <img src="reports/summary/summary_weight_trend.png" alt="體重趨勢">
+                </div>
+                <div class="chart-item">
+                    <h3 style="color: #667eea; margin-bottom: 10px;">體脂率趨勢</h3>
+                    <img src="reports/summary/summary_bodyfat_trend.png" alt="體脂率趨勢">
+                </div>
+                <div class="chart-item">
+                    <h3 style="color: #667eea; margin-bottom: 10px;">內臟脂肪趨勢</h3>
+                    <img src="reports/summary/summary_visceral_fat_trend.png" alt="內臟脂肪趨勢">
+                </div>
+                <div class="chart-item">
+                    <h3 style="color: #667eea; margin-bottom: 10px;">骨骼肌趨勢</h3>
+                    <img src="reports/summary/summary_muscle_trend.png" alt="骨骼肌趨勢">
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>🏋️ GLP1 減重追蹤系統 | 堅持就是勝利 💪</p>
+            <p style="opacity: 0.8; margin-top: 10px;">數據更新時間: 2025/11/18</p>
+        </footer>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // 隱藏所有 tab 內容
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+
+            // 移除所有 tab 的 active 狀態
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+
+            // 顯示選中的 tab
+            document.getElementById(tabName).classList.add('active');
+            
+            // 設定對應按鈕為 active
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
