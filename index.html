@@ -4,584 +4,533 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GLP-1 體態追蹤儀表板</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- 引入必要的函式庫 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+
     <style>
-        :root {
-            --primary: #10B981; /* Emerald 500 */
-            --primary-dark: #059669;
-            --secondary: #3B82F6; /* Blue 500 */
-            --bg-body: #F3F4F6;
-            --bg-card: #FFFFFF;
-            --text-main: #1F2937;
-            --text-light: #6B7280;
-            --danger: #EF4444;
-            --sidebar-width: 260px;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', 'Noto Sans TC', sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-main);
-            display: flex;
-            min-height: 100vh;
-        }
-
-        /* --- Sidebar --- */
-        .sidebar {
-            width: var(--sidebar-width);
-            background: white;
-            border-right: 1px solid #E5E7EB;
-            position: fixed;
-            height: 100vh;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            z-index: 100;
-            transition: transform 0.3s ease;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: var(--text-main);
-            margin-bottom: 40px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .logo i { color: var(--primary); }
-
-        .nav-links {
-            list-style: none;
-            flex-grow: 1;
-        }
-
-        .nav-item {
-            margin-bottom: 10px;
-        }
-
-        .nav-link {
-            display: flex;
-            align-items: center;
-            padding: 12px 15px;
-            text-decoration: none;
-            color: var(--text-light);
-            border-radius: 10px;
-            transition: all 0.2s;
-            font-weight: 500;
-            cursor: pointer;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            background-color: #ECFDF5;
-            color: var(--primary-dark);
-        }
-
-        .nav-link i {
-            margin-right: 12px;
-            width: 20px;
-            text-align: center;
-        }
-
-        .user-profile {
-            padding-top: 20px;
-            border-top: 1px solid #E5E7EB;
-            font-size: 0.9rem;
-            color: var(--text-light);
-        }
-
-        /* --- Main Content --- */
-        .main-content {
-            flex: 1;
-            margin-left: var(--sidebar-width);
-            padding: 30px;
-            width: calc(100% - var(--sidebar-width));
-        }
-
-        header {
-            margin-bottom: 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-        }
-
-        .header-title h2 { font-size: 1.8rem; margin-bottom: 5px; }
-        .header-title p { color: var(--text-light); }
-
-        /* --- KPI Cards --- */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-            transition: transform 0.2s;
-        }
-
-        .card:hover { transform: translateY(-2px); }
-
-        .kpi-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .kpi-title { font-size: 0.9rem; color: var(--text-light); font-weight: 600; }
-        .kpi-icon { 
-            width: 40px; height: 40px; 
-            border-radius: 10px; 
-            background: #ECFDF5; 
-            color: var(--primary);
-            display: flex; align-items: center; justify-content: center;
-        }
-        
-        .kpi-icon.blue { background: #EFF6FF; color: var(--secondary); }
-        .kpi-icon.red { background: #FEF2F2; color: var(--danger); }
-
-        .kpi-value { font-size: 2rem; font-weight: 700; color: var(--text-main); }
-        .kpi-unit { font-size: 1rem; color: var(--text-light); margin-left: 5px; font-weight: 500;}
-
-        .kpi-trend {
-            margin-top: 10px;
-            font-size: 0.85rem;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .trend-up { color: var(--danger); } /* 對體重來說上升是紅色 */
-        .trend-down { color: var(--primary); } /* 對體重來說下降是綠色 */
-        .trend-neutral { color: var(--text-light); }
-        
-        /* Muscle Logic is reversed */
-        .muscle-trend .trend-up { color: var(--primary); }
-        .muscle-trend .trend-down { color: var(--danger); }
-
-        /* --- Section Styling --- */
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* --- Tabs --- */
-        .tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            background: white;
-            padding: 5px;
-            border-radius: 12px;
-            width: fit-content;
-        }
-
-        .tab-btn {
-            padding: 10px 20px;
-            border: none;
-            background: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            color: var(--text-light);
-            transition: all 0.2s;
-            .active {
-                background: var(--text-main);
-                color: white;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }
-        }
-        
-        .tab-btn:hover:not(.active) {
-            background-color: #f3f4f6;
-        }
-
-        .tab-btn.active {
-            background: var(--text-main);
-            color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-
-        /* --- Reports Grid --- */
-        .reports-container {
-            display: none;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        
-        .reports-container.active { display: grid; }
-
-        .report-link {
-            text-decoration: none;
-            color: inherit;
-            background: white;
-            border: 1px solid #E5E7EB;
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        .report-link:hover {
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
-        }
-
-        .report-date { font-size: 0.8rem; color: var(--text-light); margin-bottom: 5px; }
-        .report-name { font-weight: 700; font-size: 1.1rem; margin-bottom: 10px; }
-        .report-tag { 
-            align-self: flex-start; 
-            padding: 4px 10px; 
-            border-radius: 20px; 
-            font-size: 0.75rem; 
-            font-weight: 600; 
-        }
-        .tag-summary { background: #FDF4FF; color: #C026D3; }
-        .tag-weekly { background: #EFF6FF; color: #2563EB; }
-        .tag-monthly { background: #ECFDF5; color: #059669; }
-
-        /* --- Charts Gallery --- */
-        .chart-gallery {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
-            gap: 25px;
-            margin-bottom: 40px;
-        }
-
-        .chart-box {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .chart-box h4 {
-            margin-bottom: 15px;
-            color: var(--text-light);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .chart-box img {
-            width: 100%;
-            height: auto;
-            border-radius: 8px;
-            transition: transform 0.3s;
-            cursor: pointer;
-        }
-        .chart-box img:hover { transform: scale(1.02); }
-
-        /* --- Mobile Responsive --- */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-                width: 260px;
-            }
-            .sidebar.open { transform: translateX(0); }
-            
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-                padding: 20px;
-            }
-
-            .mobile-toggle {
-                display: block;
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                z-index: 101;
-                background: white;
-                border: none;
-                padding: 10px;
-                border-radius: 8px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            }
-            
-            .chart-gallery { grid-template-columns: 1fr; }
-        }
-
-        @media (min-width: 769px) {
-            .mobile-toggle { display: none; }
-        }
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #F3F4F6; }
+        .chart-container { position: relative; height: 300px; width: 100%; }
+        /* 自定義滾動條 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
     </style>
 </head>
-<body>
+<body class="text-gray-800 flex flex-col md:flex-row min-h-screen">
 
-    <button class="mobile-toggle" onclick="toggleSidebar()">
-        <i class="fas fa-bars"></i>
-    </button>
+    <!-- Loading Overlay -->
+    <div id="loading" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-500 mb-4"></div>
+        <p class="text-gray-500 font-medium">正在從雲端讀取最新數據...</p>
+    </div>
 
-    <nav class="sidebar" id="sidebar">
-        <div class="logo">
-            <i class="fas fa-heartbeat"></i>
-            <span>GLP-1 Track</span>
-        </div>
-        
-        <ul class="nav-links">
-            <li class="nav-item">
-                <a class="nav-link active" onclick="scrollToSection('dashboard')">
-                    <i class="fas fa-chart-line"></i> 總覽儀表板
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" onclick="scrollToSection('charts')">
-                    <i class="fas fa-images"></i> 趨勢圖表
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" onclick="scrollToSection('reports')">
-                    <i class="fas fa-file-alt"></i> 詳細報告
-                </a>
-            </li>
-        </ul>
+    <!-- Error Overlay -->
+    <div id="error-msg" class="hidden fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-8 text-center">
+        <i class="fas fa-exclamation-triangle text-red-500 text-5xl mb-4"></i>
+        <h3 class="text-xl font-bold mb-2">讀取失敗</h3>
+        <p class="text-gray-600" id="error-text">無法連接到 Google Sheets，請檢查網路或 URL。</p>
+        <button onclick="location.reload()" class="mt-6 px-6 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition">重試</button>
+    </div>
 
-        <div class="user-profile">
-            <p><i class="fas fa-clock"></i> 更新於: 2025/11/18</p>
-            <p><i class="fas fa-calendar-alt"></i> 追蹤天數: 93 天</p>
-        </div>
-    </nav>
-
-    <main class="main-content">
-        
-        <header id="dashboard">
-            <div class="header-title">
-                <h2>👋 歡迎回來，Rex</h2>
-                <p>這是您目前的減重進度追蹤摘要 (2025/08 - 2025/11)</p>
+    <!-- Sidebar (Mobile friendly) -->
+    <aside class="bg-white w-full md:w-64 flex-shrink-0 md:h-screen md:fixed border-r border-gray-200 z-10">
+        <div class="p-6 flex items-center justify-between md:block">
+            <div class="flex items-center gap-3 text-emerald-600 font-bold text-2xl">
+                <i class="fas fa-heartbeat"></i>
+                <span>GLP-1 Track</span>
             </div>
+            <button class="md:hidden text-gray-500" onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">
+                <i class="fas fa-bars text-xl"></i>
+            </button>
+        </div>
+        
+        <nav id="mobile-menu" class="hidden md:block px-4 pb-4 md:pb-0">
+            <ul class="space-y-2">
+                <li>
+                    <a href="#" onclick="scrollToId('dashboard')" class="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 text-emerald-700 font-medium transition hover:bg-emerald-100">
+                        <i class="fas fa-chart-line w-5 text-center"></i> 總覽儀表板
+                    </a>
+                </li>
+                <li>
+                    <a href="#" onclick="scrollToId('charts-section')" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 font-medium transition hover:bg-gray-50 hover:text-emerald-600">
+                        <i class="fas fa-images w-5 text-center"></i> 趨勢圖表
+                    </a>
+                </li>
+                <li>
+                    <a href="#" onclick="scrollToId('table-section')" class="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 font-medium transition hover:bg-gray-50 hover:text-emerald-600">
+                        <i class="fas fa-table w-5 text-center"></i> 詳細數據
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="mt-8 pt-6 border-t border-gray-100 px-4">
+                <p class="text-xs text-gray-400 uppercase font-bold tracking-wider mb-3">System</p>
+                <div class="text-sm text-gray-500 flex flex-col gap-2">
+                    <span id="last-update"><i class="fas fa-clock mr-2"></i>更新中...</span>
+                    <span id="data-source"><i class="fas fa-database mr-2"></i>Google Sheets</span>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 md:ml-64 p-4 md:p-8 overflow-x-hidden">
+        
+        <!-- Header -->
+        <header class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4" id="dashboard">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">👋 歡迎回來，Rex</h1>
+                <p class="text-gray-500">即時分析您的身體組成數據與減重進度</p>
+            </div>
+            <a href="https://docs.google.com/spreadsheets/d/1X...YOUR_SHEET_ID.../edit" target="_blank" class="hidden md:inline-flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                <i class="fas fa-external-link-alt"></i> 查看原始資料
+            </a>
         </header>
 
-        <div class="kpi-grid">
-            <div class="card">
-                <div class="kpi-header">
-                    <span class="kpi-title">目前體重 (AM)</span>
-                    <div class="kpi-icon"><i class="fas fa-weight"></i></div>
+        <!-- KPI Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <!-- Weight KPI -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition border border-gray-100">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-400 uppercase">目前體重 (AM)</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="kpi-weight">-</h3>
+                    </div>
+                    <div class="p-3 bg-emerald-50 rounded-xl text-emerald-500">
+                        <i class="fas fa-weight text-xl"></i>
+                    </div>
                 </div>
-                <div>
-                    <span class="kpi-value">94.2</span><span class="kpi-unit">kg</span>
-                </div>
-                <div class="kpi-trend trend-down">
-                    <i class="fas fa-arrow-down"></i> 14.8 kg (總下降)
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="kpi-header">
-                    <span class="kpi-title">體脂率</span>
-                    <div class="kpi-icon blue"><i class="fas fa-percentage"></i></div>
-                </div>
-                <div>
-                    <span class="kpi-value">28.0</span><span class="kpi-unit">%</span>
-                </div>
-                <div class="kpi-trend trend-down">
-                    <i class="fas fa-arrow-down"></i> 2.3% (總下降)
+                <div class="flex items-center text-sm font-medium" id="kpi-weight-trend">
+                    <span class="text-gray-300">計算中...</span>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="kpi-header">
-                    <span class="kpi-title">脂肪重量</span>
-                    <div class="kpi-icon blue"><i class="fas fa-burn"></i></div>
+            <!-- Body Fat KPI -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition border border-gray-100">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-400 uppercase">體脂率</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="kpi-fat">-</h3>
+                    </div>
+                    <div class="p-3 bg-blue-50 rounded-xl text-blue-500">
+                        <i class="fas fa-percentage text-xl"></i>
+                    </div>
                 </div>
-                <div>
-                    <span class="kpi-value">26.4</span><span class="kpi-unit">kg</span>
-                </div>
-                <div class="kpi-trend trend-down">
-                    <i class="fas fa-arrow-down"></i> 6.6 kg (總下降)
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="kpi-header">
-                    <span class="kpi-title">骨骼肌率</span>
-                    <div class="kpi-icon red"><i class="fas fa-dumbbell"></i></div>
-                </div>
-                <div>
-                    <span class="kpi-value">30.6</span><span class="kpi-unit">%</span>
-                </div>
-                <div class="kpi-trend muscle-trend">
-                    <span class="trend-up"><i class="fas fa-arrow-up"></i> 1.7% (總提升)</span>
+                <div class="flex items-center text-sm font-medium" id="kpi-fat-trend">
+                    <span class="text-gray-300">計算中...</span>
                 </div>
             </div>
 
-            <div class="card">
-                <div class="kpi-header">
-                    <span class="kpi-title">內臟脂肪</span>
-                    <div class="kpi-icon"><i class="fas fa-heart"></i></div>
+            <!-- Muscle KPI -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition border border-gray-100">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-400 uppercase">骨骼肌率</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="kpi-muscle">-</h3>
+                    </div>
+                    <div class="p-3 bg-rose-50 rounded-xl text-rose-500">
+                        <i class="fas fa-dumbbell text-xl"></i>
+                    </div>
                 </div>
-                <div>
-                    <span class="kpi-value">15.0</span>
+                <div class="flex items-center text-sm font-medium" id="kpi-muscle-trend">
+                    <span class="text-gray-300">計算中...</span>
                 </div>
-                <div class="kpi-trend trend-down">
-                    <i class="fas fa-arrow-down"></i> 6.0 (顯著改善)
+            </div>
+
+            <!-- Visceral Fat KPI -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition border border-gray-100">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-400 uppercase">內臟脂肪</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1" id="kpi-visceral">-</h3>
+                    </div>
+                    <div class="p-3 bg-orange-50 rounded-xl text-orange-500">
+                        <i class="fas fa-heart text-xl"></i>
+                    </div>
+                </div>
+                <div class="flex items-center text-sm font-medium" id="kpi-visceral-trend">
+                    <span class="text-gray-300">計算中...</span>
                 </div>
             </div>
         </div>
 
-        <section id="charts">
-            <div class="section-title">
-                <i class="fas fa-chart-area" style="color: var(--secondary);"></i>
-                關鍵趨勢分析
+        <!-- Charts Section -->
+        <section id="charts-section" class="mb-10">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-1 h-8 bg-emerald-500 rounded-full"></div>
+                <h2 class="text-xl font-bold text-gray-800">趨勢分析</h2>
             </div>
             
-            <div class="chart-gallery">
-                <div class="chart-box">
-                    <h4>身體組成總覽</h4>
-                    <img src="reports/summary/summary_composition_overview.png" alt="組成總覽" onclick="window.open(this.src)">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Weight Chart -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 class="text-gray-500 text-sm font-bold uppercase mb-4 tracking-wider">體重變化趨勢 (kg)</h4>
+                    <div class="chart-container">
+                        <canvas id="weightChart"></canvas>
+                    </div>
                 </div>
-                <div class="chart-box">
-                    <h4>體重組成 (脂肪 vs 肌肉 kg)</h4>
-                    <img src="reports/summary/summary_weight_composition_kg.png" alt="體重組成" onclick="window.open(this.src)">
+
+                <!-- Fat Chart -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 class="text-gray-500 text-sm font-bold uppercase mb-4 tracking-wider">體脂率變化趨勢 (%)</h4>
+                    <div class="chart-container">
+                        <canvas id="fatChart"></canvas>
+                    </div>
                 </div>
-                <div class="chart-box">
-                    <h4>臨床模型預測 (v2)</h4>
-                    <img src="reports/summary/summary_v2_clinical_forecast.png" alt="預測模型" onclick="window.open(this.src)">
+
+                <!-- Visceral Fat Chart -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 class="text-gray-500 text-sm font-bold uppercase mb-4 tracking-wider">內臟脂肪趨勢</h4>
+                    <div class="chart-container">
+                        <canvas id="visceralChart"></canvas>
+                    </div>
                 </div>
-                <div class="chart-box">
-                    <h4>內臟脂肪趨勢</h4>
-                    <img src="reports/summary/summary_visceral_fat_trend.png" alt="內臟脂肪" onclick="window.open(this.src)">
+
+                <!-- Muscle Chart -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h4 class="text-gray-500 text-sm font-bold uppercase mb-4 tracking-wider">骨骼肌率趨勢 (%)</h4>
+                    <div class="chart-container">
+                        <canvas id="muscleChart"></canvas>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section id="reports">
-            <div class="section-title">
-                <i class="fas fa-clipboard-list" style="color: var(--primary);"></i>
-                數據報告存檔
+        <!-- Data Table Section -->
+        <section id="table-section" class="mb-10">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-1 h-8 bg-blue-500 rounded-full"></div>
+                    <h2 class="text-xl font-bold text-gray-800">詳細紀錄 (最近 7 筆)</h2>
+                </div>
             </div>
-
-            <div class="tabs">
-                <button class="tab-btn active" onclick="filterReports('summary')">總結與預測</button>
-                <button class="tab-btn" onclick="filterReports('weekly')">每週週報</button>
-                <button class="tab-btn" onclick="filterReports('monthly')">月度報告</button>
-            </div>
-
-            <div id="tab-summary" class="reports-container active">
-                <a href="reports/summary/overall_summary_report.md" class="report-link">
-                    <div>
-                        <div class="report-date">2025/08/15 - 至今</div>
-                        <div class="report-name">🎯 整體總結報告</div>
-                        <p style="color:var(--text-light); font-size:0.9rem;">包含完整減重歷程分析與代謝指標</p>
-                    </div>
-                    <span class="report-tag tag-summary">Summary</span>
-                </a>
-                <a href="reports/summary/simulation_v2_clinical_forecast.md" class="report-link">
-                    <div>
-                        <div class="report-date">未來預測</div>
-                        <div class="report-name">🔮 臨床預測報告 (v2)</div>
-                        <p style="color:var(--text-light); font-size:0.9rem;">基於 GLP-1 模型與個人數據校準</p>
-                    </div>
-                    <span class="report-tag tag-summary">Forecast</span>
-                </a>
-            </div>
-
-            <div id="tab-weekly" class="reports-container">
-                <a href="reports/2025-CW14/2025-CW14_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW14 (11/14-11/20)</div><div class="report-name">第 14 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW13/2025-CW13_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW13 (11/07-11/13)</div><div class="report-name">第 13 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW12/2025-CW12_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW12 (10/31-11/06)</div><div class="report-name">第 12 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW11/2025-CW11_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW11 (10/24-10/30)</div><div class="report-name">第 11 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW10/2025-CW10_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW10 (10/17-10/23)</div><div class="report-name">第 10 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW09/2025-CW09_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW09 (10/10-10/16)</div><div class="report-name">第 9 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW08/2025-CW08_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW08 (10/03-10/09)</div><div class="report-name">第 8 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW07/2025-CW07_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW07 (09/26-10/02)</div><div class="report-name">第 7 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-                <a href="reports/2025-CW01/2025-CW01_weekly_report.md" class="report-link">
-                    <div><div class="report-date">2025-CW01 (08/15-08/21)</div><div class="report-name">第 1 週週報</div></div>
-                    <span class="report-tag tag-weekly">Weekly</span>
-                </a>
-            </div>
-
-            <div id="tab-monthly" class="reports-container">
-                <a href="reports/monthly/2025-11/2025-11_monthly_report.md" class="report-link">
-                    <div><div class="report-date">2025/11</div><div class="report-name">11月 月度分析</div></div>
-                    <span class="report-tag tag-monthly">Monthly</span>
-                </a>
-                <a href="reports/monthly/2025-10/2025-10_monthly_report.md" class="report-link">
-                    <div><div class="report-date">2025/10</div><div class="report-name">10月 月度分析</div></div>
-                    <span class="report-tag tag-monthly">Monthly</span>
-                </a>
-                <a href="reports/monthly/2025-09/2025-09_monthly_report.md" class="report-link">
-                    <div><div class="report-date">2025/09</div><div class="report-name">9月 月度分析</div></div>
-                    <span class="report-tag tag-monthly">Monthly</span>
-                </a>
-                <a href="reports/monthly/2025-08/2025-08_monthly_report.md" class="report-link">
-                    <div><div class="report-date">2025/08</div><div class="report-name">8月 月度分析</div></div>
-                    <span class="report-tag tag-monthly">Monthly</span>
-                </a>
+            
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
+                            <tr>
+                                <th class="px-6 py-4">日期</th>
+                                <th class="px-6 py-4">體重 (AM)</th>
+                                <th class="px-6 py-4">體脂 (AM)</th>
+                                <th class="px-6 py-4">內臟脂肪</th>
+                                <th class="px-6 py-4">骨骼肌 (AM)</th>
+                                <th class="px-6 py-4">骨骼肌重 (AM)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body" class="divide-y divide-gray-100">
+                            <!-- JS will populate this -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </section>
+
+        <footer class="text-center text-gray-400 text-xs py-8">
+            <p>&copy; 2025 GLP-1 Weight Tracker. Powered by Dynamic CSV Parsing.</p>
+        </footer>
 
     </main>
 
     <script>
-        // Tab Filtering Logic
-        function filterReports(type) {
-            // Remove active class from buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            // Add active to clicked button
-            event.target.classList.add('active');
+        // 設定 CSV URL (公開發布的連結)
+        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTsEpxVh2vol3e0ZPsnEktRIuPCl_p4YaI0lcKv04UvulHojxCJTbQyPicY0LhMvw31HD7e4gxtE6AB/pub?output=csv';
 
-            // Hide all containers
-            document.querySelectorAll('.reports-container').forEach(div => div.classList.remove('active'));
-            // Show selected container
-            document.getElementById(`tab-${type}`).classList.add('active');
-        }
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+        });
 
-        // Sidebar Toggle for Mobile
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-        }
-
-        // Smooth Scroll
-        function scrollToSection(id) {
-            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-            if(window.innerWidth <= 768) {
-                toggleSidebar(); // Close sidebar on mobile after click
+        async function fetchData() {
+            try {
+                const response = await fetch(CSV_URL);
+                if (!response.ok) throw new Error("Network response was not ok");
+                const csvText = await response.text();
+                
+                // 使用 PapaParse 解析 CSV
+                Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        const data = processData(results.data);
+                        updateDashboard(data);
+                        document.getElementById('loading').classList.add('hidden');
+                    },
+                    error: function(err) {
+                        showError("CSV 解析失敗: " + err.message);
+                    }
+                });
+            } catch (error) {
+                showError("無法讀取資料: " + error.message);
             }
+        }
+
+        function showError(msg) {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('error-msg').classList.remove('hidden');
+            document.getElementById('error-text').innerText = msg;
+        }
+
+        function scrollToId(id) {
+            document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+            // Close mobile menu if open
+            if (window.innerWidth < 768) {
+                document.getElementById('mobile-menu').classList.add('hidden');
+            }
+        }
+
+        // 資料處理邏輯 (模擬 Python 腳本邏輯)
+        function processData(rawData) {
+            // 偵測格式：是 OMRON 原始檔 (含"測量日期") 還是 Daily Log (含"早上體重")
+            const isRaw = rawData.length > 0 && '測量日期' in rawData[0];
+            let processed = [];
+
+            if (isRaw) {
+                // 處理原始數據：分組 AM/PM
+                const grouped = {};
+                
+                rawData.forEach(row => {
+                    // 解析日期
+                    let dtStr = row['測量日期'];
+                    // 簡單處理日期字串 YYYY/MM/DD HH:MM
+                    let dt = new Date(dtStr);
+                    if (isNaN(dt.getTime())) return; // 跳過無效日期
+
+                    // 邏輯：凌晨 0-5 點算前一天晚上
+                    let hour = dt.getHours();
+                    let dateKey = dt.toISOString().split('T')[0];
+                    
+                    if (hour < 5) {
+                        let prevDate = new Date(dt);
+                        prevDate.setDate(dt.getDate() - 1);
+                        dateKey = prevDate.toISOString().split('T')[0];
+                    }
+
+                    // AM: 5-12, PM: 其他
+                    let period = (hour >= 5 && hour < 12) ? 'AM' : 'PM';
+
+                    if (!grouped[dateKey]) grouped[dateKey] = { AM: [], PM: [] };
+                    
+                    // 收集數據
+                    let val = {
+                        weight: parseFloat(row['體重(kg)']),
+                        fat: parseFloat(row['體脂肪(%)']),
+                        visceral: parseFloat(row['內臟脂肪程度']),
+                        muscle: parseFloat(row['骨骼肌(%)'])
+                    };
+                    
+                    if (!isNaN(val.weight)) grouped[dateKey][period].push(val);
+                });
+
+                // 計算平均值並轉為陣列
+                Object.keys(grouped).sort().forEach(date => {
+                    const dayData = grouped[date];
+                    
+                    const avg = (arr, key) => {
+                        const valid = arr.filter(x => !isNaN(x[key]));
+                        if (valid.length === 0) return null;
+                        return valid.reduce((a, b) => a + b[key], 0) / valid.length;
+                    };
+
+                    processed.push({
+                        date: date,
+                        weight_am: avg(dayData.AM, 'weight'),
+                        weight_pm: avg(dayData.PM, 'weight'),
+                        fat_am: avg(dayData.AM, 'fat'),
+                        fat_pm: avg(dayData.PM, 'fat'),
+                        visceral_am: avg(dayData.AM, 'visceral'), // 通常取 AM 或平均
+                        muscle_am: avg(dayData.AM, 'muscle'),
+                        muscle_pm: avg(dayData.PM, 'muscle')
+                    });
+                });
+
+            } else {
+                // 處理 Daily Log 格式 (假設欄位名稱對應)
+                // 欄位可能為: 日期, 早上體重 (kg), ...
+                processed = rawData.map(row => {
+                    // 嘗試正規化日期 YYYY/MM/DD -> YYYY-MM-DD
+                    let d = row['日期'] || row['Date'];
+                    if(d) d = d.replace(/\//g, '-');
+                    
+                    return {
+                        date: d,
+                        weight_am: parseFloat(row['早上體重 (kg)'] || row['早上體重']),
+                        weight_pm: parseFloat(row['晚上體重 (kg)'] || row['晚上體重']),
+                        fat_am: parseFloat(row['早上體脂 (%)'] || row['早上體脂']),
+                        fat_pm: parseFloat(row['晚上體脂 (%)'] || row['晚上體脂']),
+                        visceral_am: parseFloat(row['早上內臟脂肪'] || row['內臟脂肪程度'] || row['內臟脂肪']),
+                        muscle_am: parseFloat(row['早上骨骼肌 (%)'] || row['骨骼肌 (%)'] || row['早上骨骼肌']),
+                        muscle_pm: parseFloat(row['晚上骨骼肌 (%)'] || row['晚上骨骼肌'])
+                    };
+                }).filter(r => r.date && (!isNaN(r.weight_am) || !isNaN(r.weight_pm)));
+            }
+            
+            // 排序
+            processed.sort((a, b) => new Date(a.date) - new Date(b.date));
+            return processed;
+        }
+
+        function updateDashboard(data) {
+            if (data.length === 0) {
+                showError("沒有有效的數據紀錄");
+                return;
+            }
+
+            const latest = data[data.length - 1];
+            const start = data[0];
+            const prev = data.length > 1 ? data[data.length - 2] : start;
+
+            // Update Meta Info
+            document.getElementById('last-update').innerHTML = `<i class="fas fa-clock mr-2"></i>最新數據: ${latest.date}`;
+
+            // Helper for trends
+            const renderTrend = (curr, startVal, isInverse = false) => {
+                if (curr == null || startVal == null) return `<span class="text-gray-300">無數據</span>`;
+                let diff = curr - startVal;
+                let percent = (diff / startVal) * 100;
+                let icon = diff > 0 ? 'fa-arrow-up' : (diff < 0 ? 'fa-arrow-down' : 'fa-minus');
+                
+                // 判斷顏色：體重/體脂下降是綠色(好)，上升是紅色(壞)。骨骼肌相反。
+                // isInverse=true 代表下降是壞事 (例如肌肉)
+                let isGood = isInverse ? diff > 0 : diff < 0;
+                if (Math.abs(diff) < 0.1) isGood = null; // 持平
+
+                let colorClass = isGood === true ? 'text-emerald-500' : (isGood === false ? 'text-red-500' : 'text-gray-400');
+                
+                return `<span class="${colorClass} flex items-center gap-1">
+                            <i class="fas ${icon}"></i>
+                            ${Math.abs(diff).toFixed(1)} (${Math.abs(percent).toFixed(1)}%)
+                        </span>
+                        <span class="text-gray-400 text-xs ml-1">總變化</span>`;
+            };
+
+            // 1. Update KPIs
+            // Weight
+            const wAM = latest.weight_am || latest.weight_pm; // Fallback
+            document.getElementById('kpi-weight').innerText = wAM ? wAM.toFixed(1) : '-';
+            document.getElementById('kpi-weight-trend').innerHTML = renderTrend(wAM, start.weight_am || start.weight_pm);
+
+            // Fat
+            const fVal = latest.fat_am || latest.fat_pm;
+            document.getElementById('kpi-fat').innerText = fVal ? fVal.toFixed(1) + '%' : '-';
+            document.getElementById('kpi-fat-trend').innerHTML = renderTrend(fVal, start.fat_am || start.fat_pm);
+
+            // Muscle
+            const mVal = latest.muscle_am || latest.muscle_pm;
+            document.getElementById('kpi-muscle').innerText = mVal ? mVal.toFixed(1) + '%' : '-';
+            document.getElementById('kpi-muscle-trend').innerHTML = renderTrend(mVal, start.muscle_am || start.muscle_pm, true);
+
+            // Visceral
+            const vVal = latest.visceral_am;
+            document.getElementById('kpi-visceral').innerText = vVal ? vVal.toFixed(1) : '-';
+            document.getElementById('kpi-visceral-trend').innerHTML = renderTrend(vVal, start.visceral_am);
+
+            // 2. Render Charts
+            renderChart('weightChart', '體重 (kg)', data.map(d => d.date), [
+                { label: '早上體重', data: data.map(d => d.weight_am), color: '#10B981' }, // Emerald
+                { label: '晚上體重', data: data.map(d => d.weight_pm), color: '#F59E0B' }  // Amber
+            ]);
+
+            renderChart('fatChart', '體脂率 (%)', data.map(d => d.date), [
+                { label: '早上體脂', data: data.map(d => d.fat_am), color: '#3B82F6' }, // Blue
+                { label: '晚上體脂', data: data.map(d => d.fat_pm), color: '#93C5FD' }  
+            ]);
+
+            renderChart('visceralChart', '內臟脂肪', data.map(d => d.date), [
+                { label: '內臟脂肪 (AM)', data: data.map(d => d.visceral_am), color: '#F97316' } // Orange
+            ]);
+
+            renderChart('muscleChart', '骨骼肌率 (%)', data.map(d => d.date), [
+                { label: '早上骨骼肌', data: data.map(d => d.muscle_am), color: '#EF4444' }, // Red
+                { label: '晚上骨骼肌', data: data.map(d => d.muscle_pm), color: '#FCA5A5' }
+            ]);
+
+            // 3. Render Table (Last 7 records reversed)
+            const tableBody = document.getElementById('data-table-body');
+            tableBody.innerHTML = '';
+            
+            const recentData = [...data].reverse().slice(0, 10);
+            recentData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition";
+                
+                // Calculate Muscle Mass (kg) = Weight * Muscle% / 100
+                let muscleKg = '-';
+                if (row.weight_am && row.muscle_am) {
+                    muscleKg = (row.weight_am * row.muscle_am / 100).toFixed(1) + ' kg';
+                }
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-gray-900">${row.date}</td>
+                    <td class="px-6 py-4 text-emerald-600 font-bold">${row.weight_am ? row.weight_am.toFixed(1) : '-'}</td>
+                    <td class="px-6 py-4">${row.fat_am ? row.fat_am.toFixed(1) + '%' : '-'}</td>
+                    <td class="px-6 py-4">${row.visceral_am ? row.visceral_am.toFixed(1) : '-'}</td>
+                    <td class="px-6 py-4 text-rose-600">${row.muscle_am ? row.muscle_am.toFixed(1) + '%' : '-'}</td>
+                    <td class="px-6 py-4 text-gray-500">${muscleKg}</td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        function renderChart(canvasId, title, labels, datasets) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            
+            // Prepare datasets for Chart.js
+            const chartDatasets = datasets.map(ds => ({
+                label: ds.label,
+                data: ds.data,
+                borderColor: ds.color,
+                backgroundColor: ds.color,
+                tension: 0.3,
+                pointRadius: 3,
+                pointHoverRadius: 6,
+                fill: false,
+                spanGaps: true // Connect lines even if data missing
+            }));
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: chartDatasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            titleColor: '#1F2937',
+                            bodyColor: '#4B5563',
+                            borderColor: '#E5E7EB',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { maxTicksLimit: 8 }
+                        },
+                        y: {
+                            grid: { borderDash: [2, 4], color: '#F3F4F6' },
+                            beginAtZero: false
+                        }
+                    },
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    }
+                }
+            });
         }
     </script>
 </body>
