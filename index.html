@@ -3,13 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GLP-1 體態大師 v3.0</title>
+    <title>HealthTrack - GLP-1 體重管理系統</title>
     
     <!-- 核心函式庫 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- PDF 生成套件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
     <!-- 字型與圖示 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -18,24 +23,62 @@
     <!-- 自定義樣式 -->
     <style>
         :root {
-            --primary-gradient: linear-gradient(135deg, #10B981 0%, #059669 100%);
-            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-            --card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+            --primary-blue: #2563EB;
+            --primary-blue-light: #3B82F6;
+            --primary-blue-dark: #1E40AF;
+            --secondary-teal: #0891B2;
+            --accent-green: #059669;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-500: #6B7280;
+            --gray-700: #374151;
+            --gray-900: #111827;
+            --card-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
         
         body { 
-            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif; 
-            background-color: #F0F2F5; 
+            font-family: 'Plus Jakarta Sans', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif; 
+            background-color: var(--gray-50);
             -webkit-font-smoothing: antialiased;
+            color: var(--gray-900);
         }
 
         .chart-container { position: relative; height: 320px; width: 100%; }
         
-        /* 玻璃擬態 */
+        /* 玻璃擬態 - 健身風格 */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px) saturate(180%);
+            border: 2px solid rgba(255, 107, 53, 0.1);
+            box-shadow: 0 8px 32px rgba(255, 107, 53, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+        }
+        
+        /* 活力卡片 */
+        .energy-card {
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .energy-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+            transform: rotate(45deg);
+            transition: all 0.6s;
+        }
+        .energy-card:hover::before {
+            left: 100%;
+        }
+        .energy-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 60px rgba(255, 107, 53, 0.25);
         }
 
         /* 自定義滾動條 */
@@ -44,127 +87,348 @@
         ::-webkit-scrollbar-track { background: transparent; }
 
         /* 動畫 */
-        .fade-in { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .fade-in { animation: fadeIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(20px) scale(0.95); } 
+            to { opacity: 1; transform: translateY(0) scale(1); } 
+        }
+        
+        /* 彈跳動畫 */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        /* 脈衝放大 */
+        @keyframes pulse-scale {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        /* 滑入動畫 */
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(50px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        /* 旋轉閃光 */
+        @keyframes shine {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
 
         /* 排序圖示 */
         .sort-icon::after { content: '\f0dc'; font-family: 'Font Awesome 6 Free'; font-weight: 900; margin-left: 5px; opacity: 0.3; }
-        .sort-asc::after { content: '\f0de'; opacity: 1; color: #10B981; }
-        .sort-desc::after { content: '\f0dd'; opacity: 1; color: #10B981; }
+        .sort-asc::after { content: '\f0de'; opacity: 1; color: var(--primary-blue); }
+        .sort-desc::after { content: '\f0dd'; opacity: 1; color: var(--primary-blue); }
+
+        /* BMI 色階條 - 醫療風格 */
+        .bmi-scale {
+            height: 8px;
+            background: linear-gradient(to right, 
+                #3B82F6 0%, #3B82F6 18.5%, 
+                #059669 18.5%, #059669 24%, 
+                #F59E0B 24%, #F59E0B 27%, 
+                #EF4444 27%, #EF4444 100%);
+            border-radius: 4px;
+            position: relative;
+        }
+        .bmi-indicator {
+            position: absolute;
+            top: -6px;
+            transform: translateX(-50%);
+            transition: left 0.3s ease;
+        }
+
+        /* 慶祝動畫 */
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            z-index: 9999;
+            animation: confetti-fall 3s ease-out forwards;
+        }
+
+        /* 脈衝動畫 - 簡約版 */
+        @keyframes pulse-soft {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        .pulse-soft {
+            animation: pulse-soft 2s ease-in-out infinite;
+        }
+
+        /* 深色模式 */
+        .dark {
+            color-scheme: dark;
+        }
+        .dark body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+        }
+        .dark .medical-card,
+        .dark .bg-white {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        .dark .text-gray-900 {
+            color: #e2e8f0 !important;
+        }
+        .dark .text-gray-800 {
+            color: #cbd5e1 !important;
+        }
+        .dark .text-gray-700 {
+            color: #94a3b8 !important;
+        }
+        .dark .text-gray-600 {
+            color: #64748b !important;
+        }
+        .dark .text-gray-500 {
+            color: #475569 !important;
+        }
+        .dark .bg-gray-50,
+        .dark .bg-gray-100 {
+            background-color: #334155 !important;
+        }
+        .dark .border-gray-200,
+        .dark .border-gray-100 {
+            border-color: #475569 !important;
+        }
+        .dark .hover\:bg-slate-50:hover,
+        .dark .hover\:bg-gray-100:hover {
+            background-color: #334155 !important;
+        }
+        .dark .hover\:bg-blue-50:hover {
+            background-color: #1e3a8a !important;
+        }
+        .dark #sidebar {
+            background-color: #1e293b;
+            border-color: #334155;
+        }
+        .dark .text-slate-600 {
+            color: #94a3b8 !important;
+        }
+        .dark .text-slate-800 {
+            color: #cbd5e1 !important;
+        }
     </style>
 </head>
 <body class="text-slate-800 flex flex-col md:flex-row min-h-screen">
 
     <!-- Loading Overlay -->
-    <div id="loading" class="fixed inset-0 bg-white/95 z-50 flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="relative">
-            <div class="w-16 h-16 border-4 border-slate-100 border-t-emerald-500 rounded-full animate-spin"></div>
-            <div class="absolute top-0 left-0 w-16 h-16 flex items-center justify-center">
-                <i class="fas fa-bolt text-emerald-500 text-lg"></i>
+    <div id="loading" class="fixed inset-0 bg-gray-50 z-50 flex flex-col items-center justify-center transition-opacity duration-500">
+        <div class="relative mb-6">
+            <div class="w-20 h-20 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            <div class="absolute top-0 left-0 w-20 h-20 flex items-center justify-center">
+                <i class="fas fa-heartbeat text-blue-600 text-2xl pulse-soft"></i>
             </div>
         </div>
-        <p class="mt-4 text-slate-500 font-medium tracking-wide">數據同步中...</p>
+        <p class="text-blue-600 font-semibold text-lg tracking-wide pulse-soft">數據同步中...</p>
+        <p class="text-gray-500 font-medium text-sm mt-2">正在載入您的健康數據</p>
     </div>
 
     <!-- Settings Modal -->
     <div id="settings-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all scale-95 opacity-0" id="settings-panel">
-            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h3 class="text-xl font-bold text-slate-800"><i class="fas fa-cog text-emerald-500 mr-2"></i>個人化設定</h3>
-                <button onclick="toggleSettings()" class="text-slate-400 hover:text-slate-600 transition">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto transform transition-all scale-95 opacity-0 border border-gray-200" id="settings-panel">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center bg-white">
+                <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="far fa-user-circle text-blue-600"></i> 個人資料設定
+                </h3>
+                <button onclick="toggleSettings()" class="text-gray-400 hover:text-gray-600 transition-all">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
             <div class="p-6 space-y-5">
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">您的身高 (cm)</label>
-                    <input type="number" id="input-height" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition outline-none" placeholder="例如: 175">
-                    <p class="text-xs text-slate-400 mt-1">用於計算 BMI 指數</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                        <i class="far fa-user text-blue-600"></i> 您的身高 (cm)
+                    </label>
+                    <input type="number" id="input-height" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 175">
+                    <p class="text-xs text-gray-500 mt-2">用於計算 BMI 指數</p>
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">目標體重 (kg)</label>
-                    <input type="number" id="input-goal" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition outline-none" placeholder="例如: 75">
-                    <p class="text-xs text-slate-400 mt-1">用於計算達成率與圖表目標線</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                        <i class="far fa-flag text-teal-600"></i> 目標體重 (kg)
+                    </label>
+                    <input type="number" id="input-goal" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 75">
+                    <p class="text-xs text-gray-500 mt-2">用於計算達成率與圖表目標線</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                        <i class="far fa-crosshairs text-amber-600"></i> 目標體脂率 (%)
+                    </label>
+                    <input type="number" step="0.1" id="input-goal-fat" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 15">
+                    <p class="text-xs text-gray-500 mt-2">用於體脂率進度追蹤</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                        <i class="far fa-chart-line text-green-600"></i> 目標 BMI
+                    </label>
+                    <input type="number" step="0.1" id="input-goal-bmi" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 22">
+                    <p class="text-xs text-gray-500 mt-2">標準 BMI 範圍：18.5 - 24</p>
                 </div>
             </div>
-            <div class="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                <button onclick="toggleSettings()" class="px-4 py-2 text-slate-600 hover:bg-slate-200 rounded-lg transition font-medium">取消</button>
-                <button onclick="saveSettings()" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition shadow-lg shadow-emerald-200 font-bold">
-                    <i class="fas fa-save mr-2"></i>儲存設定
+            <div class="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                <button onclick="toggleSettings()" class="px-5 py-3 text-gray-600 hover:bg-white rounded-lg transition-all font-medium border border-gray-300">取消</button>
+                <button onclick="saveSettings()" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all font-medium flex items-center gap-2">
+                    <i class="far fa-save"></i> 儲存設定
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Entry Modal -->
+    <div id="data-entry-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto transform transition-all scale-95 opacity-0 border border-gray-200" id="data-entry-panel">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center bg-white">
+                <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                    <i class="far fa-plus-square text-green-600"></i> 新增體重紀錄
+                </h3>
+                <button onclick="toggleDataEntryModal()" class="text-gray-400 hover:text-gray-600 transition-all">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <i class="far fa-calendar text-blue-600"></i> 記錄日期
+                    </label>
+                    <input type="date" id="input-entry-date" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">體重 (早) kg</label>
+                        <input type="number" step="0.1" id="input-entry-weight-am" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 82.5">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">體重 (晚) kg</label>
+                        <input type="number" step="0.1" id="input-entry-weight-pm" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 83.2">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">體脂率 %</label>
+                        <input type="number" step="0.1" id="input-entry-fat" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 22.5">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">肌肉率 %</label>
+                        <input type="number" step="0.1" id="input-entry-muscle" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 48.5">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                        <i class="far fa-heart text-red-600"></i> 內臟脂肪等級
+                    </label>
+                    <input type="number" id="input-entry-visceral" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition outline-none text-gray-700" placeholder="例如: 8">
+                </div>
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <p class="text-xs text-blue-700"><i class="fas fa-info-circle"></i> 此功能僅將數據暫存於瀏覽器中，不會上傳至 Google Sheets</p>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+                <button onclick="toggleDataEntryModal()" class="px-5 py-3 text-gray-600 hover:bg-white rounded-lg transition-all font-medium border border-gray-300">取消</button>
+                <button onclick="saveDataEntry()" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all font-medium flex items-center gap-2">
+                    <i class="far fa-save"></i> 儲存紀錄
                 </button>
             </div>
         </div>
     </div>
 
     <!-- Sidebar -->
-    <aside class="bg-white w-full md:w-72 flex-shrink-0 md:h-screen md:fixed z-40 border-r border-slate-200 flex flex-col transition-all duration-300" id="sidebar">
-        <div class="p-6 flex items-center justify-between border-b border-slate-100">
+    <aside class="bg-white w-full md:w-72 flex-shrink-0 md:h-screen md:fixed z-40 border-r border-gray-200 flex flex-col transition-all duration-300" id="sidebar">
+        <div class="p-6 flex items-center justify-between border-b border-gray-200 bg-white">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
-                    <i class="fas fa-chart-pie"></i>
+                <div class="w-12 h-12 rounded-lg bg-blue-600 flex items-center justify-center text-white">
+                    <i class="fas fa-heartbeat text-xl"></i>
                 </div>
                 <div>
-                    <h1 class="font-bold text-xl text-slate-800 tracking-tight">GLP-1 Track</h1>
-                    <p class="text-xs text-slate-400 font-medium">Pro Dashboard</p>
+                    <h1 class="font-semibold text-xl text-gray-900 tracking-tight">HealthTrack</h1>
+                    <p class="text-xs text-blue-600 font-medium">體重管理系統</p>
                 </div>
             </div>
-            <button class="md:hidden text-slate-400 hover:text-slate-700" onclick="toggleMobileMenu()">
+            <button class="md:hidden text-gray-400 hover:text-gray-700" onclick="toggleMobileMenu()">
                 <i class="fas fa-times text-xl"></i>
+            </button>
+            <!-- 深色模式切換 -->
+            <button onclick="toggleDarkMode()" class="hidden md:block text-gray-400 hover:text-gray-700 transition" title="切換主題">
+                <i class="far fa-moon text-xl" id="theme-icon"></i>
             </button>
         </div>
         
         <nav class="flex-1 overflow-y-auto p-4 space-y-1">
-            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-3 mt-4">分析報表</div>
-            <a href="#" onclick="scrollToId('dashboard')" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition active-nav">
-                <i class="fas fa-home w-5 text-center transition group-hover:text-emerald-500"></i> 
+            <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-3 mt-4">數據視覺化</div>
+            <a href="#" onclick="scrollToId('dashboard')" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-200 active-nav border-l-4 border-transparent hover:border-blue-600">
+                <i class="far fa-chart-bar w-5 text-center transition group-hover:text-blue-600"></i> 
                 <span class="font-medium">總覽儀表板</span>
             </a>
-            <a href="#" onclick="scrollToId('charts-section')" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition">
-                <i class="fas fa-chart-line w-5 text-center transition group-hover:text-emerald-500"></i> 
+            <a href="#" onclick="scrollToId('charts-section')" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-200 border-l-4 border-transparent hover:border-blue-600">
+                <i class="far fa-chart-line w-5 text-center transition group-hover:text-teal-600"></i> 
                 <span class="font-medium">趨勢分析</span>
             </a>
-            <a href="#" onclick="scrollToId('table-section')" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 transition">
-                <i class="fas fa-table w-5 text-center transition group-hover:text-emerald-500"></i> 
+            <a href="#" onclick="scrollToId('table-section')" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-blue-50 transition-all duration-200 border-l-4 border-transparent hover:border-blue-600">
+                <i class="far fa-list-alt w-5 text-center transition group-hover:text-blue-600"></i> 
                 <span class="font-medium">數據明細</span>
             </a>
             
+            <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-3 mt-4">數據管理</div>
+            <a href="#" onclick="toggleDataEntryModal()" class="nav-item group flex items-center gap-3 px-4 py-3 rounded-lg text-gray-700 hover:bg-green-50 transition-all duration-200 border-l-4 border-transparent hover:border-green-600">
+                <i class="far fa-plus-square w-5 text-center transition group-hover:text-green-600"></i> 
+                <span class="font-medium">新增紀錄</span>
+            </a>
+            
             <div class="mt-8">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 px-3">個人目標</div>
-                <div class="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-3 opacity-10"><i class="fas fa-bullseye text-6xl"></i></div>
+                <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3 px-3">個人目標</div>
+                <div class="bg-blue-600 rounded-lg p-5 text-white shadow-md relative overflow-hidden medical-card">
                     <div class="relative z-10">
                         <div class="flex justify-between items-center mb-2">
-                            <span class="text-slate-400 text-xs">目標體重</span>
-                            <button onclick="toggleSettings()" class="text-emerald-400 hover:text-emerald-300 text-xs"><i class="fas fa-edit"></i> 修改</button>
+                            <span class="text-blue-100 text-xs font-medium">目標體重</span>
+                            <button onclick="toggleSettings()" class="text-blue-200 hover:text-white text-xs font-medium bg-white/20 px-3 py-1 rounded-md backdrop-blur-sm transition-all"><i class="far fa-edit"></i> 修改</button>
                         </div>
-                        <div class="text-2xl font-bold mb-4"><span id="sidebar-goal">-</span> <span class="text-sm font-normal text-slate-400">kg</span></div>
+                        <div class="text-3xl font-semibold mb-4"><span id="sidebar-goal">-</span> <span class="text-lg font-normal text-blue-100">kg</span></div>
                         
-                        <div class="mb-1 flex justify-between text-xs">
-                            <span class="text-slate-400">達成率</span>
-                            <span class="text-emerald-400 font-bold" id="sidebar-progress">-</span>
+                        <div class="mb-2 flex justify-between text-xs">
+                            <span class="text-blue-100 font-medium">達成率</span>
+                            <span class="text-white font-semibold text-sm" id="sidebar-progress">-</span>
                         </div>
-                        <div class="w-full bg-slate-700 rounded-full h-1.5">
-                            <div class="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000" id="sidebar-progress-bar" style="width: 0%"></div>
+                        <div class="w-full bg-white/30 rounded-full h-2.5 backdrop-blur-sm">
+                            <div class="bg-white h-2.5 rounded-full transition-all duration-1000" id="sidebar-progress-bar" style="width: 0%"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </nav>
 
-        <div class="p-4 border-t border-slate-100">
+        <div class="p-4 border-t border-gray-100">
+            <!-- 提醒設定 -->
+            <div class="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-gray-700">每日提醒</span>
+                    <button onclick="toggleReminder()" id="reminder-toggle" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-gray-300">
+                        <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1"></span>
+                    </button>
+                </div>
+                <div id="reminder-time-picker" class="hidden mt-2">
+                    <input type="time" id="reminder-time" value="09:00" class="w-full px-3 py-2 text-xs border border-gray-300 rounded-md">
+                </div>
+            </div>
+            
             <div class="flex items-center gap-3 px-2">
-                <div class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                <span class="text-xs text-slate-500 font-medium" id="last-update">等待同步...</span>
+                <div class="w-2 h-2 rounded-full bg-green-500 pulse-soft"></div>
+                <span class="text-xs text-gray-500 font-medium" id="last-update">等待同步...</span>
             </div>
         </div>
     </aside>
 
     <!-- Mobile Header -->
-    <div class="md:hidden fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-30 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-        <div class="font-bold text-lg text-slate-800 flex items-center gap-2">
-            <i class="fas fa-heartbeat text-emerald-500"></i> GLP-1 Track
+    <div class="md:hidden fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-md z-30 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
+        <div class="font-semibold text-lg text-gray-900 flex items-center gap-2">
+            <i class="fas fa-heartbeat text-blue-600"></i> HealthTrack
         </div>
-        <button onclick="toggleMobileMenu()" class="p-2 text-slate-600 bg-slate-100 rounded-lg">
+        <button onclick="toggleMobileMenu()" class="p-2 text-gray-600 bg-gray-100 rounded-lg">
             <i class="fas fa-bars"></i>
         </button>
     </div>
@@ -173,85 +437,382 @@
     <main class="flex-1 md:ml-72 p-4 md:p-8 pt-20 md:pt-8 overflow-x-hidden">
         
         <!-- Top Control Bar -->
-        <header class="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 fade-in" id="dashboard">
+        <header class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 fade-in" id="dashboard">
             <div>
-                <h2 class="text-2xl font-bold text-slate-800">體態儀表板</h2>
-                <p class="text-slate-500 text-sm mt-1">追蹤您的身體組成變化趨勢</p>
+                <h2 class="text-3xl font-semibold text-gray-900">體重管理儀表板</h2>
+                <p class="text-sm text-gray-500 mt-1">追蹤您的體重變化</p>
             </div>
-            
-            <div class="flex gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-                <button onclick="filterDate('1M')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-500 hover:bg-slate-50 transition active">近 30 天</button>
-                <button onclick="filterDate('3M')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-500 hover:bg-slate-50 transition">近 90 天</button>
-                <button onclick="filterDate('ALL')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg text-slate-500 hover:bg-slate-50 transition">全期間</button>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="filterDate('1W')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 border border-gray-200 transition-all duration-200">近 7 天</button>
+                <button onclick="filterDate('1M')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 border border-gray-200 transition-all duration-200 active">近 30 天</button>
+                <button onclick="filterDate('3M')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 border border-gray-200 transition-all duration-200">近 90 天</button>
+                <button onclick="filterDate('ALL')" class="filter-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-600 hover:bg-blue-50 hover:text-blue-600 border border-gray-200 transition-all duration-200">全期間</button>
             </div>
         </header>
 
+        <!-- 每日激勵語錄 + 快速統計 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8 fade-in" style="animation-delay: 0.05s">
+            <!-- 激勵語錄 -->
+            <div class="lg:col-span-2 medical-card bg-blue-600 p-6 rounded-lg text-white shadow-md relative overflow-hidden">
+                <div class="relative z-10 flex items-center gap-4">
+                    <div class="text-4xl">💬</div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium opacity-90 mb-2">每日激勵</p>
+                        <p class="text-lg font-medium leading-relaxed" id="daily-motivation">正在載入激勵語錄...</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 快速統計 -->
+            <div class="medical-card bg-white p-6 rounded-lg border border-gray-200 shadow-md">
+                <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
+                    <i class="far fa-chart-bar text-blue-600"></i> 快速統計
+                </h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-600 font-medium">週平均減重</span>
+                        <span class="text-lg font-semibold text-blue-600" id="weekly-avg">-</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-600 font-medium">距離目標</span>
+                        <span class="text-lg font-semibold text-teal-600" id="goal-remaining">-</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-gray-600 font-medium">預計達標</span>
+                        <span class="text-lg font-semibold text-gray-700" id="estimated-days">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 週比較分析 -->
+        <div class="medical-card bg-white p-6 rounded-lg border border-gray-200 shadow-md mb-8 fade-in" style="animation-delay: 0.08s">
+            <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-5 flex items-center gap-2">
+                <i class="far fa-calendar-alt text-blue-600"></i> <span class="hidden sm:inline">週比較分析</span><span class="sm:hidden">週比較</span>
+            </h3>
+            <div class="grid grid-cols-2 gap-3 sm:gap-4" id="week-comparison">
+                <!-- JS Generated -->
+            </div>
+        </div>
+
+        <!-- 進階統計 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 mb-8 fade-in" style="animation-delay: 0.1s">
+            <!-- 最佳/最差紀錄 -->
+            <div class="medical-card bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-md">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-5 flex items-center gap-2">
+                    <i class="far fa-trophy text-blue-600"></i> 最佳紀錄
+                </h3>
+                <div class="space-y-4" id="best-records">
+                    <!-- JS Generated -->
+                </div>
+            </div>
+
+            <!-- 波動分析 -->
+            <div class="medical-card bg-white p-4 sm:p-6 rounded-lg border border-gray-200 shadow-md">
+                <h3 class="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-5 flex items-center gap-2">
+                    <i class="far fa-chart-line text-blue-600"></i> 波動分析
+                </h3>
+                <div class="space-y-4" id="fluctuation-analysis">
+                    <!-- JS Generated -->
+                </div>
+            </div>
+        </div>
+
         <!-- KPI Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8 fade-in" style="animation-delay: 0.1s">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 mb-8 fade-in" style="animation-delay: 0.1s">
             
             <!-- Weight -->
-            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:translate-y-[-2px] transition-transform duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-full -mr-10 -mt-10 opacity-50"></div>
+            <div class="medical-card bg-white p-6 rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200 relative overflow-hidden">
                 <div class="relative z-10">
-                    <p class="text-xs font-bold text-slate-400 uppercase mb-1">目前體重 (AM)</p>
-                    <div class="flex items-baseline gap-1 mb-2">
-                        <span class="text-3xl font-bold text-slate-800" id="kpi-weight">-</span>
-                        <span class="text-sm text-slate-500 font-medium">kg</span>
+                    <p class="text-xs font-medium text-gray-600 uppercase mb-2 flex items-center gap-1">
+                        <i class="far fa-circle text-blue-600"></i> 目前體重
+                    </p>
+                    <div class="flex items-baseline gap-2 mb-3">
+                        <span class="text-4xl font-semibold text-gray-900" id="kpi-weight">-</span>
+                        <span class="text-lg text-gray-500 font-normal">kg</span>
                     </div>
                     <div id="kpi-weight-trend" class="text-sm flex items-center gap-1">
-                        <div class="h-2 w-16 bg-slate-100 rounded-full overflow-hidden animate-pulse"></div>
+                        <div class="h-2 w-20 bg-gray-200 rounded-full overflow-hidden pulse-soft"></div>
                     </div>
                 </div>
             </div>
 
             <!-- BMI -->
-            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:translate-y-[-2px] transition-transform duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full -mr-10 -mt-10 opacity-50"></div>
+            <div class="medical-card bg-white p-6 rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200 relative overflow-hidden">
                 <div class="relative z-10">
-                    <p class="text-xs font-bold text-slate-400 uppercase mb-1">BMI 指數</p>
-                    <div class="flex items-baseline gap-2 mb-2">
-                        <span class="text-3xl font-bold text-slate-800" id="kpi-bmi-val">-</span>
-                        <span id="kpi-bmi-badge" class="text-xs px-2 py-1 rounded-md bg-slate-100 text-slate-500 font-bold">-</span>
+                    <p class="text-xs font-medium text-gray-600 uppercase mb-2 flex items-center gap-1">
+                        <i class="far fa-heart text-teal-600"></i> BMI 指數
+                    </p>
+                    <div class="flex items-baseline gap-2 mb-3">
+                        <span class="text-4xl font-semibold text-gray-900" id="kpi-bmi-val">-</span>
+                        <span id="kpi-bmi-badge" class="text-xs px-3 py-1 rounded-md bg-gray-100 text-gray-700 font-medium">-</span>
                     </div>
-                    <p class="text-xs text-slate-400">標準: 18.5 ~ 24.0</p>
+                    <p class="text-xs text-gray-500 font-normal">標準: 18.5 ~ 24.0</p>
                 </div>
             </div>
 
             <!-- Body Fat -->
-            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:translate-y-[-2px] transition-transform duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-full -mr-10 -mt-10 opacity-50"></div>
+            <div class="medical-card bg-white p-6 rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200 relative overflow-hidden">
                 <div class="relative z-10">
-                    <p class="text-xs font-bold text-slate-400 uppercase mb-1">體脂率</p>
-                    <div class="flex items-baseline gap-1 mb-2">
-                        <span class="text-3xl font-bold text-slate-800" id="kpi-fat">-</span>
-                        <span class="text-sm text-slate-500 font-medium">%</span>
+                    <p class="text-xs font-medium text-gray-600 uppercase mb-2 flex items-center gap-1">
+                        <i class="far fa-chart-bar text-blue-600"></i> 體脂率
+                    </p>
+                    <div class="flex items-baseline gap-2 mb-3">
+                        <span class="text-4xl font-semibold text-gray-900" id="kpi-fat">-</span>
+                        <span class="text-lg text-gray-500 font-normal">%</span>
                     </div>
                     <div id="kpi-fat-trend" class="text-sm flex items-center gap-1"></div>
                 </div>
             </div>
 
             <!-- Visceral Fat -->
-            <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:translate-y-[-2px] transition-transform duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-full -mr-10 -mt-10 opacity-50"></div>
+            <div class="medical-card bg-white p-6 rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200 relative overflow-hidden">
                 <div class="relative z-10">
-                    <p class="text-xs font-bold text-slate-400 uppercase mb-1">內臟脂肪</p>
-                    <div class="flex items-baseline gap-1 mb-2">
-                        <span class="text-3xl font-bold text-slate-800" id="kpi-visceral">-</span>
+                    <p class="text-xs font-medium text-gray-600 uppercase mb-2 flex items-center gap-1">
+                        <i class="far fa-circle text-red-600"></i> 內臟脂肪
+                    </p>
+                    <div class="flex items-baseline gap-2 mb-3">
+                        <span class="text-4xl font-semibold text-gray-900" id="kpi-visceral">-</span>
                     </div>
                     <div id="kpi-visceral-trend" class="text-sm flex items-center gap-1"></div>
                 </div>
             </div>
 
              <!-- Muscle -->
-             <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:translate-y-[-2px] transition-transform duration-300 relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-full -mr-10 -mt-10 opacity-50"></div>
+             <div class="medical-card bg-white p-6 rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200 relative overflow-hidden">
                 <div class="relative z-10">
-                    <p class="text-xs font-bold text-slate-400 uppercase mb-1">骨骼肌率</p>
-                    <div class="flex items-baseline gap-1 mb-2">
-                        <span class="text-3xl font-bold text-slate-800" id="kpi-muscle">-</span>
-                        <span class="text-sm text-slate-500 font-medium">%</span>
+                    <p class="text-xs font-medium text-gray-600 uppercase mb-2 flex items-center gap-1">
+                        <i class="far fa-user text-green-600"></i> 骨骼肌率
+                    </p>
+                    <div class="flex items-baseline gap-2 mb-3">
+                        <span class="text-4xl font-semibold text-gray-900" id="kpi-muscle">-</span>
+                        <span class="text-lg text-gray-500 font-normal">%</span>
                     </div>
                     <div id="kpi-muscle-trend" class="text-sm flex items-center gap-1"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- InBody 風格人體體態圖 -->
+        <div class="mb-8 fade-in" style="animation-delay: 0.12s">
+            <div class="medical-card bg-white p-8 rounded-lg border border-gray-200 shadow-md">
+                <div class="text-center mb-6">
+                    <h3 class="text-2xl font-semibold text-gray-900 inline-flex items-center gap-3">
+                        <i class="far fa-user-circle text-blue-600"></i>
+                        體態分析
+                    </h3>
+                    <p class="text-gray-500 text-sm mt-2">即時體態數據視覺化</p>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                    <!-- 左側數據 -->
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                    <i class="far fa-circle text-blue-600"></i> 體重
+                                </span>
+                                <span class="text-2xl font-semibold text-gray-900" id="body-weight">-</span>
+                            </div>
+                            <div class="text-xs text-gray-500">kg</div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                    <i class="far fa-chart-bar text-blue-600"></i> 體脂率
+                                </span>
+                                <span class="text-2xl font-semibold text-gray-900" id="body-fat">-</span>
+                            </div>
+                            <div class="text-xs text-gray-500">%</div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                    <i class="far fa-heart text-teal-600"></i> BMI
+                                </span>
+                                <span class="text-2xl font-semibold text-gray-900" id="body-bmi">-</span>
+                            </div>
+                            <div class="text-xs text-gray-500" id="body-bmi-status">評估中</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 中間人體圖 -->
+                    <div class="flex justify-center items-center">
+                        <div class="relative">
+                            <!-- SVG 人體圖示 -->
+                            <svg width="200" height="400" viewBox="0 0 200 400" class="drop-shadow-lg">
+                                <!-- 頭部 -->
+                                <ellipse cx="100" cy="40" rx="30" ry="35" fill="#3B82F6" opacity="0.15" stroke="#3B82F6" stroke-width="2"/>
+                                <ellipse cx="100" cy="40" rx="25" ry="30" fill="#60A5FA" opacity="0.2"/>
+                                
+                                <!-- 身體 -->
+                                <rect x="70" y="75" width="60" height="120" rx="15" fill="#0891B2" opacity="0.15" stroke="#0891B2" stroke-width="2"/>
+                                <rect x="75" y="80" width="50" height="110" rx="12" fill="#06B6D4" opacity="0.2"/>
+                                
+                                <!-- 手臂 -->
+                                <ellipse cx="50" cy="120" rx="18" ry="55" fill="#2563EB" opacity="0.15" stroke="#2563EB" stroke-width="2" transform="rotate(-15 50 120)"/>
+                                <ellipse cx="150" cy="120" rx="18" ry="55" fill="#2563EB" opacity="0.15" stroke="#2563EB" stroke-width="2" transform="rotate(15 150 120)"/>
+                                
+                                <!-- 腹部區域 -->
+                                <rect x="75" y="140" width="50" height="40" rx="8" fill="#3B82F6" opacity="0.2" stroke="#3B82F6" stroke-width="1" stroke-dasharray="4,4"/>
+                                
+                                <!-- 骨骼肌區域 -->
+                                <rect x="78" y="95" width="44" height="35" rx="6" fill="#059669" opacity="0.2" stroke="#059669" stroke-width="1" stroke-dasharray="3,3"/>
+                                
+                                <!-- 腿部 -->
+                                <rect x="75" y="195" width="20" height="130" rx="10" fill="#0891B2" opacity="0.15" stroke="#0891B2" stroke-width="2"/>
+                                <rect x="105" y="195" width="20" height="130" rx="10" fill="#0891B2" opacity="0.15" stroke="#0891B2" stroke-width="2"/>
+                                
+                                <!-- 數據標註點 -->
+                                <circle cx="100" cy="40" r="4" fill="#3B82F6" class="pulse-soft"/>
+                                <circle cx="100" cy="115" r="4" fill="#059669" class="pulse-soft" style="animation-delay: 0.2s"/>
+                                <circle cx="100" cy="160" r="4" fill="#3B82F6" class="pulse-soft" style="animation-delay: 0.4s"/>
+                                <circle cx="85" cy="260" r="4" fill="#0891B2" class="pulse-soft" style="animation-delay: 0.6s"/>
+                            </svg>
+                            
+                            <!-- 浮動標籤 -->
+                            <div class="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-3 py-1 rounded-md text-xs font-medium shadow-md">
+                                BMI <span id="body-figure-bmi">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右側數據 -->
+                    <div class="space-y-4">
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                    <i class="far fa-user text-green-600"></i> 骨骼肌
+                                </span>
+                                <span class="text-2xl font-semibold text-gray-900" id="body-muscle">-</span>
+                            </div>
+                            <div class="text-xs text-gray-500">%</div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                    <i class="far fa-circle text-red-600"></i> 內臟脂肪
+                                </span>
+                                <span class="text-2xl font-semibold text-gray-900" id="body-visceral">-</span>
+                            </div>
+                            <div class="text-xs text-gray-500">等級</div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-medium text-gray-600 flex items-center gap-1">
+                                    <i class="far fa-chart-line text-blue-600"></i> 達成率
+                                </span>
+                                <span class="text-2xl font-semibold text-gray-900" id="body-progress">-</span>
+                            </div>
+                            <div class="text-xs text-gray-500">%</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 底部健康評分 -->
+                <div class="mt-8 bg-blue-600 p-6 rounded-lg text-white relative overflow-hidden">
+                    <div class="relative z-10 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium opacity-90 mb-1">綜合健康評分</p>
+                            <p class="text-xs opacity-75">根據您的 BMI、體脂率、骨骼肌計算</p>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-5xl font-semibold" id="health-score">-</div>
+                            <div class="text-sm font-medium mt-1" id="health-grade">計算中...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 體態變化對比 & 成就區 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 fade-in" style="animation-delay: 0.15s">
+            
+            <!-- 體重變化對比 -->
+            <div class="medical-card bg-blue-600 p-7 rounded-lg text-white shadow-md relative overflow-hidden">
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-5">
+                        <h3 class="text-sm font-medium uppercase tracking-wide flex items-center gap-2">
+                            <i class="far fa-chart-line"></i> 體重變化
+                        </h3>
+                    </div>
+                    <div class="flex items-center justify-between mb-6">
+                        <div class="text-center bg-white/15 backdrop-blur-sm rounded-lg p-4 flex-1 mr-3">
+                            <p class="text-xs opacity-90 mb-2 font-medium">起始</p>
+                            <p class="text-3xl font-semibold" id="weight-start">-</p>
+                            <p class="text-xs opacity-75 mt-1">kg</p>
+                        </div>
+                        <div class="text-4xl" id="body-icon">🚶</div>
+                        <div class="text-center bg-white/15 backdrop-blur-sm rounded-lg p-4 flex-1 ml-3">
+                            <p class="text-xs opacity-90 mb-2 font-medium">現在</p>
+                            <p class="text-3xl font-semibold" id="weight-now">-</p>
+                            <p class="text-xs opacity-75 mt-1">kg</p>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg p-4 text-center">
+                        <p class="text-xs font-medium text-blue-600 mb-1">總減重</p>
+                        <p class="text-3xl font-semibold text-blue-600" id="total-loss">- kg</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BMI 視覺化 -->
+            <div class="medical-card bg-white p-7 rounded-lg border border-gray-200 shadow-md">
+                <h3 class="text-sm font-semibold text-gray-700 mb-5 flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-teal-100 flex items-center justify-center">
+                        <i class="far fa-heart text-teal-600 text-sm"></i>
+                    </div>
+                    <span>BMI 健康指標</span>
+                </h3>
+                <div class="text-center mb-5">
+                    <div class="text-6xl font-semibold text-gray-900" id="bmi-large">-</div>
+                    <p class="text-sm font-medium text-gray-500 mt-2" id="bmi-status">評估中...</p>
+                </div>
+                <div class="bmi-scale relative mb-4 h-2 shadow-sm">
+                    <div class="bmi-indicator" id="bmi-pointer">
+                        <div class="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-blue-600"></div>
+                    </div>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 font-medium mb-4 px-1">
+                    <span>過輕</span>
+                    <span>標準</span>
+                    <span>過重</span>
+                    <span>肥胖</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div class="bg-blue-50 p-3 rounded-lg text-center border border-blue-200">
+                        <p class="text-blue-700 font-medium">過輕</p>
+                        <p class="text-blue-600 font-normal mt-1">&lt; 18.5</p>
+                    </div>
+                    <div class="bg-green-50 p-3 rounded-lg text-center border border-green-200">
+                        <p class="text-green-700 font-medium">標準</p>
+                        <p class="text-green-600 font-normal mt-1">18.5-24</p>
+                    </div>
+                    <div class="bg-yellow-50 p-3 rounded-lg text-center border border-yellow-200">
+                        <p class="text-yellow-700 font-medium">過重</p>
+                        <p class="text-yellow-600 font-normal mt-1">24-27</p>
+                    </div>
+                    <div class="bg-red-50 p-3 rounded-lg text-center border border-red-200">
+                        <p class="text-red-700 font-medium">肥胖</p>
+                        <p class="text-red-600 font-normal mt-1">&gt; 27</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 成就徽章 -->
+            <div class="medical-card bg-white p-7 rounded-lg border border-gray-200 shadow-md">
+                <h3 class="text-sm font-semibold text-gray-700 mb-5 flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-lg bg-yellow-100 flex items-center justify-center">
+                        <i class="far fa-star text-yellow-600 text-sm"></i>
+                    </div>
+                    <span>達成成就</span>
+                </h3>
+                <div class="grid grid-cols-3 gap-4" id="achievements">
+                    <!-- JS Generated -->
                 </div>
             </div>
         </div>
@@ -259,16 +820,25 @@
         <!-- Charts Section -->
         <section id="charts-section" class="mb-8 space-y-6 fade-in" style="animation-delay: 0.2s">
             
+            <!-- 圖表控制按鈕 -->
+            <div class="flex justify-end gap-2">
+                <button onclick="resetAllCharts()" class="text-xs text-gray-600 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 px-4 py-2 rounded-md border border-gray-200 font-medium transition flex items-center gap-2">
+                    <i class="fas fa-undo"></i> 重置所有圖表
+                </button>
+            </div>
+            
             <!-- Main Weight Chart -->
-            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-2">
+            <div class="medical-card bg-white p-7 rounded-lg border border-gray-200 shadow-md">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
                     <div>
-                        <h3 class="text-lg font-bold text-slate-800">體重趨勢分析</h3>
-                        <p class="text-sm text-slate-500">實測體重 vs 7日移動平均 vs 目標線</p>
+                        <h3 class="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                            <i class="far fa-chart-bar text-blue-600"></i> 體重趨勢分析
+                        </h3>
+                        <p class="text-sm text-gray-500 mt-1">實測 vs 7日平均 vs 目標線 <span class="text-xs text-gray-400">（滾輪縮放・拖曳平移）</span></p>
                     </div>
-                    <div class="flex items-center gap-2 text-xs bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        <span class="text-slate-600">目標: <span id="chart-goal-val">-</span> kg</span>
+                    <div class="flex items-center gap-2 text-xs bg-gray-50 px-4 py-2 rounded-md border border-gray-200 font-medium">
+                        <span class="w-3 h-3 rounded-full bg-blue-600"></span>
+                        <span class="text-gray-700">目標: <span id="chart-goal-val" class="font-semibold text-blue-600">-</span> kg</span>
                     </div>
                 </div>
                 <div class="chart-wrapper">
@@ -278,15 +848,19 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Fat Chart -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">體脂率變化 (%)</h3>
+                <div class="medical-card bg-white p-7 rounded-lg border border-gray-200 shadow-md">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+                        <i class="far fa-chart-bar text-blue-600"></i> 體脂率變化 (%)
+                    </h3>
                     <div class="chart-wrapper">
                         <canvas id="fatChart"></canvas>
                     </div>
                 </div>
                 <!-- Muscle/Visceral Chart -->
-                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                    <h3 class="text-lg font-bold text-slate-800 mb-4">骨骼肌 & 內臟脂肪</h3>
+                <div class="medical-card bg-white p-7 rounded-lg border border-gray-200 shadow-md">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+                        <i class="far fa-user text-green-600"></i> 骨骼肌 & 內臟脂肪
+                    </h3>
                     <div class="chart-wrapper">
                         <canvas id="mvChart"></canvas>
                     </div>
@@ -296,24 +870,42 @@
 
         <!-- Data Table -->
         <section id="table-section" class="mb-12 fade-in" style="animation-delay: 0.3s">
-            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                    <h3 class="font-bold text-slate-800">數據明細記錄</h3>
-                    <span class="text-xs text-slate-400 bg-white px-2 py-1 rounded border border-slate-200">顯示最近 15 筆</span>
+            <div class="medical-card bg-white rounded-lg border border-gray-200 shadow-md overflow-hidden">
+                <div class="p-4 sm:p-6 border-b border-gray-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <h3 class="font-semibold text-base sm:text-xl text-gray-900 flex items-center gap-2">
+                        <i class="far fa-list-alt text-blue-600"></i> <span class="hidden sm:inline">數據明細記錄</span><span class="sm:hidden">數據記錄</span>
+                    </h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <!-- 表格筆數選擇 -->
+                        <select id="table-rows" onchange="updateTableRows()" class="text-xs text-gray-600 bg-gray-50 px-3 py-2 rounded-md border border-gray-200 font-medium cursor-pointer hover:bg-gray-100 transition">
+                            <option value="15">15 筆</option>
+                            <option value="30">30 筆</option>
+                            <option value="50">50 筆</option>
+                            <option value="all">全部</option>
+                        </select>
+                        <!-- PDF 匯出按鈕 -->
+                        <button onclick="exportPDF()" class="text-xs text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-md font-medium transition flex items-center gap-2">
+                            <i class="far fa-file-pdf"></i> <span class="hidden sm:inline">PDF</span>
+                        </button>
+                        <!-- CSV 匯出按鈕 -->
+                        <button onclick="exportCSV()" class="text-xs text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md font-medium transition flex items-center gap-2">
+                            <i class="far fa-file-excel"></i> <span class="hidden sm:inline">CSV</span>
+                        </button>
+                    </div>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                        <thead class="bg-gray-50 text-gray-700 font-medium border-b border-gray-200">
                             <tr>
-                                <th class="px-6 py-4 cursor-pointer hover:text-emerald-600 transition sort-icon" onclick="sortTable('date')">日期</th>
-                                <th class="px-6 py-4 cursor-pointer hover:text-emerald-600 transition sort-icon" onclick="sortTable('weight')">體重 (AM)</th>
-                                <th class="px-6 py-4 cursor-pointer hover:text-emerald-600 transition sort-icon" onclick="sortTable('fat')">體脂 (AM)</th>
-                                <th class="px-6 py-4 cursor-pointer hover:text-emerald-600 transition sort-icon" onclick="sortTable('muscle')">骨骼肌 (AM)</th>
-                                <th class="px-6 py-4 cursor-pointer hover:text-emerald-600 transition sort-icon" onclick="sortTable('visceral')">內臟脂肪</th>
-                                <th class="px-6 py-4 text-right">單日變化</th>
+                                <th class="px-3 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-blue-600 transition-all duration-200 sort-icon text-xs sm:text-sm" onclick="sortTable('date')">日期</th>
+                                <th class="px-3 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-blue-600 transition-all duration-200 sort-icon text-xs sm:text-sm whitespace-nowrap" onclick="sortTable('weight')">體重</th>
+                                <th class="px-3 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-blue-600 transition-all duration-200 sort-icon text-xs sm:text-sm whitespace-nowrap" onclick="sortTable('fat')">體脂</th>
+                                <th class="px-3 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-blue-600 transition-all duration-200 sort-icon text-xs sm:text-sm whitespace-nowrap" onclick="sortTable('muscle')">肌肉</th>
+                                <th class="px-3 sm:px-6 py-3 sm:py-4 cursor-pointer hover:text-blue-600 transition-all duration-200 sort-icon text-xs sm:text-sm whitespace-nowrap" onclick="sortTable('visceral')">內臟</th>
+                                <th class="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs sm:text-sm whitespace-nowrap">變化</th>
                             </tr>
                         </thead>
-                        <tbody id="data-table-body" class="divide-y divide-slate-100">
+                        <tbody id="data-table-body" class="divide-y divide-gray-100">
                             <!-- JS Generated -->
                         </tbody>
                     </table>
@@ -321,8 +913,12 @@
             </div>
         </section>
         
-        <footer class="text-center text-slate-400 text-xs pb-8">
-            <p>GLP-1 Weight Tracker v3.0 | Powered by Chart.js & Tailwind</p>
+        <footer class="text-center text-gray-500 text-xs pb-8 font-medium">
+            <p class="flex items-center justify-center gap-2">
+                <i class="far fa-heart text-blue-600"></i>
+                <span class="text-gray-700 font-semibold">HealthTrack</span>
+                <span>| Powered by Chart.js & Tailwind | 每一步都是進步 🔥</span>
+            </p>
         </footer>
 
     </main>
@@ -336,6 +932,8 @@
             CSV_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTsEpxVh2vol3e0ZPsnEktRIuPCl_p4YaI0lcKv04UvulHojxCJTbQyPicY0LhMvw31HD7e4gxtE6AB/pub?output=csv',
             DEFAULT_HEIGHT: 175,
             DEFAULT_GOAL: 79,
+            DEFAULT_GOAL_FAT: 15,
+            DEFAULT_GOAL_BMI: 22,
             CACHE_KEY: 'glp1_v3_data',
             SETTINGS_KEY: 'glp1_v3_settings',
             CACHE_DURATION: 30 * 60 * 1000 // 30 mins
@@ -345,10 +943,22 @@
             allData: [],
             filteredData: [],
             filterRange: '1M',
-            userSettings: { height: CONFIG.DEFAULT_HEIGHT, goal: CONFIG.DEFAULT_GOAL },
+            userSettings: { 
+                height: CONFIG.DEFAULT_HEIGHT, 
+                goal: CONFIG.DEFAULT_GOAL,
+                goalFat: CONFIG.DEFAULT_GOAL_FAT,
+                goalBMI: CONFIG.DEFAULT_GOAL_BMI
+            },
             charts: {},
-            sort: { col: 'date', order: 'desc' }
+            sort: { col: 'date', order: 'desc' },
+            tableRowLimit: '15',
+            darkMode: localStorage.getItem('darkMode') === 'true'
         };
+
+        // Initialize Dark Mode
+        if (STATE.darkMode) {
+            document.documentElement.classList.add('dark');
+        }
 
         // ------------------------------------------------
         // 2. 初始化與事件 (Init & Events)
@@ -356,15 +966,130 @@
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
             initDataLoad();
+            initDarkMode();
+            initReminder();
+            registerServiceWorker();
         });
+
+        // ------------------------------------------------
+        // Service Worker 註冊（離線支援）
+        // ------------------------------------------------
+        async function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                try {
+                    // 由於我們使用單一 HTML 文件，這裡創建一個內聯的 Service Worker
+                    const swCode = `
+                        const CACHE_NAME = 'healthtrack-v1';
+                        const urlsToCache = [
+                            '/',
+                            '/index.html'
+                        ];
+
+                        self.addEventListener('install', (event) => {
+                            event.waitUntil(
+                                caches.open(CACHE_NAME)
+                                    .then((cache) => cache.addAll(urlsToCache))
+                            );
+                        });
+
+                        self.addEventListener('fetch', (event) => {
+                            event.respondWith(
+                                caches.match(event.request)
+                                    .then((response) => {
+                                        if (response) {
+                                            return response;
+                                        }
+                                        return fetch(event.request)
+                                            .catch(() => {
+                                                // 離線時返回基本頁面
+                                                if (event.request.mode === 'navigate') {
+                                                    return caches.match('/');
+                                                }
+                                            });
+                                    })
+                            );
+                        });
+
+                        self.addEventListener('activate', (event) => {
+                            event.waitUntil(
+                                caches.keys().then((cacheNames) => {
+                                    return Promise.all(
+                                        cacheNames.map((cacheName) => {
+                                            if (cacheName !== CACHE_NAME) {
+                                                return caches.delete(cacheName);
+                                            }
+                                        })
+                                    );
+                                })
+                            );
+                        });
+                    `;
+                    
+                    // 創建 Blob 並註冊
+                    const blob = new Blob([swCode], { type: 'application/javascript' });
+                    const swUrl = URL.createObjectURL(blob);
+                    
+                    const registration = await navigator.serviceWorker.register(swUrl);
+                    console.log('Service Worker 註冊成功:', registration.scope);
+                    
+                    // 離線/在線狀態提示
+                    window.addEventListener('online', () => {
+                        console.log('網路已連線');
+                        showToast('網路已連線', 'success');
+                    });
+                    
+                    window.addEventListener('offline', () => {
+                        console.log('目前離線');
+                        showToast('目前離線模式', 'warning');
+                    });
+                    
+                } catch (error) {
+                    console.log('Service Worker 註冊失敗:', error);
+                }
+            }
+        }
+
+        // 簡單的 Toast 通知
+        function showToast(message, type = 'info') {
+            const colors = {
+                success: 'bg-green-600',
+                warning: 'bg-yellow-600',
+                error: 'bg-red-600',
+                info: 'bg-blue-600'
+            };
+            
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 ${colors[type]} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => document.body.removeChild(toast), 300);
+            }, 3000);
+        }
+
+        function initDarkMode() {
+            const icon = document.getElementById('theme-icon');
+            if (STATE.darkMode && icon) {
+                icon.classList.replace('fa-moon', 'fa-sun');
+            }
+        }
 
         function loadSettings() {
             const saved = localStorage.getItem(CONFIG.SETTINGS_KEY);
-            if (saved) STATE.userSettings = JSON.parse(saved);
+            if (saved) {
+                STATE.userSettings = JSON.parse(saved);
+                // 確保新設定有預設值
+                if (!STATE.userSettings.goalFat) STATE.userSettings.goalFat = CONFIG.DEFAULT_GOAL_FAT;
+                if (!STATE.userSettings.goalBMI) STATE.userSettings.goalBMI = CONFIG.DEFAULT_GOAL_BMI;
+            }
             
             // Update UI with settings
             document.getElementById('input-height').value = STATE.userSettings.height;
             document.getElementById('input-goal').value = STATE.userSettings.goal;
+            document.getElementById('input-goal-fat').value = STATE.userSettings.goalFat || CONFIG.DEFAULT_GOAL_FAT;
+            document.getElementById('input-goal-bmi').value = STATE.userSettings.goalBMI || CONFIG.DEFAULT_GOAL_BMI;
             updateSettingsUI();
         }
 
@@ -405,9 +1130,16 @@
         function saveSettings() {
             const h = parseFloat(document.getElementById('input-height').value);
             const g = parseFloat(document.getElementById('input-goal').value);
+            const gf = parseFloat(document.getElementById('input-goal-fat').value) || CONFIG.DEFAULT_GOAL_FAT;
+            const gb = parseFloat(document.getElementById('input-goal-bmi').value) || CONFIG.DEFAULT_GOAL_BMI;
             
             if (h > 0 && g > 0) {
-                STATE.userSettings = { height: h, goal: g };
+                STATE.userSettings = { 
+                    height: h, 
+                    goal: g,
+                    goalFat: gf,
+                    goalBMI: gb
+                };
                 localStorage.setItem(CONFIG.SETTINGS_KEY, JSON.stringify(STATE.userSettings));
                 updateSettingsUI();
                 renderKPIs(); // Recalculate BMI
@@ -416,6 +1148,120 @@
             } else {
                 alert("請輸入有效的數值！");
             }
+        }
+
+        // ------------------------------------------------
+        // 數據輸入功能
+        // ------------------------------------------------
+        function toggleDataEntryModal() {
+            const modal = document.getElementById('data-entry-modal');
+            const panel = document.getElementById('data-entry-panel');
+            
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+                // 設定預設日期為今天
+                document.getElementById('input-entry-date').value = new Date().toISOString().split('T')[0];
+                // Animation in
+                setTimeout(() => {
+                    panel.classList.remove('scale-95', 'opacity-0');
+                    panel.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            } else {
+                // Animation out
+                panel.classList.remove('scale-100', 'opacity-100');
+                panel.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 300);
+                // 清空表單
+                document.getElementById('input-entry-weight-am').value = '';
+                document.getElementById('input-entry-weight-pm').value = '';
+                document.getElementById('input-entry-fat').value = '';
+                document.getElementById('input-entry-muscle').value = '';
+                document.getElementById('input-entry-visceral').value = '';
+            }
+        }
+
+        function saveDataEntry() {
+            const date = document.getElementById('input-entry-date').value;
+            const wAm = parseFloat(document.getElementById('input-entry-weight-am').value);
+            const wPm = parseFloat(document.getElementById('input-entry-weight-pm').value);
+            const fat = parseFloat(document.getElementById('input-entry-fat').value);
+            const muscle = parseFloat(document.getElementById('input-entry-muscle').value);
+            const visceral = parseFloat(document.getElementById('input-entry-visceral').value);
+
+            if (!date) {
+                alert('請選擇日期！');
+                return;
+            }
+
+            if (!wAm && !wPm) {
+                alert('請至少輸入一個體重數值！');
+                return;
+            }
+
+            // 創建新紀錄
+            const newEntry = {
+                date: date,
+                w_am: wAm || null,
+                w_pm: wPm || null,
+                f_am: fat || null,
+                m_am: muscle || null,
+                v: visceral || null
+            };
+
+            // 檢查是否已存在該日期的紀錄
+            const existingIndex = STATE.allData.findIndex(d => d.date === date);
+            if (existingIndex >= 0) {
+                if (confirm('該日期已有紀錄，是否覆蓋？')) {
+                    STATE.allData[existingIndex] = newEntry;
+                } else {
+                    return;
+                }
+            } else {
+                // 加入新紀錄並排序
+                STATE.allData.push(newEntry);
+                STATE.allData.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+
+            // 儲存到 localStorage
+            const localData = JSON.parse(localStorage.getItem('localDataEntries') || '[]');
+            const localIndex = localData.findIndex(d => d.date === date);
+            if (localIndex >= 0) {
+                localData[localIndex] = newEntry;
+            } else {
+                localData.push(newEntry);
+            }
+            localStorage.setItem('localDataEntries', JSON.stringify(localData));
+
+            // 重新處理數據
+            processData(STATE.allData);
+            
+            // 關閉 modal
+            toggleDataEntryModal();
+            
+            // 顯示成功訊息
+            alert('紀錄已儲存！');
+        }
+
+        // 在載入數據後合併本地紀錄
+        function mergeLocalData(data) {
+            const localData = JSON.parse(localStorage.getItem('localDataEntries') || '[]');
+            if (localData.length === 0) return data;
+
+            // 合併數據
+            const merged = [...data];
+            localData.forEach(local => {
+                const existingIndex = merged.findIndex(d => d.date === local.date);
+                if (existingIndex >= 0) {
+                    // 本地數據優先
+                    merged[existingIndex] = { ...merged[existingIndex], ...local };
+                } else {
+                    merged.push(local);
+                }
+            });
+
+            // 排序
+            merged.sort((a, b) => new Date(b.date) - new Date(a.date));
+            return merged;
         }
 
         function toggleMobileMenu() {
@@ -442,61 +1288,110 @@
         // 3. 資料處理 (Data Handling)
         // ------------------------------------------------
         async function initDataLoad() {
-            // Try Cache
-            const cached = localStorage.getItem(CONFIG.CACHE_KEY);
-            let hasCache = false;
-            
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    if (Date.now() - parsed.timestamp < CONFIG.CACHE_DURATION) {
-                        processData(parsed.data);
-                        hasCache = true;
-                        // Silent update
-                        fetchCSV(true);
+            try {
+                // Try Cache
+                const cached = localStorage.getItem(CONFIG.CACHE_KEY);
+                let hasCache = false;
+                
+                if (cached) {
+                    try {
+                        const parsed = JSON.parse(cached);
+                        if (Date.now() - parsed.timestamp < CONFIG.CACHE_DURATION) {
+                            processData(parsed.data);
+                            hasCache = true;
+                            // Silent update
+                            setTimeout(() => fetchCSV(true), 1000);
+                            return;
+                        }
+                    } catch(e) { 
+                        console.error("Cache invalid", e);
+                        localStorage.removeItem(CONFIG.CACHE_KEY);
                     }
-                } catch(e) { console.error("Cache invalid"); }
-            }
+                }
 
-            if (!hasCache) {
-                await fetchCSV(false);
+                if (!hasCache) {
+                    await fetchCSV(false);
+                }
+            } catch(e) {
+                console.error("Init error:", e);
+                hideLoading();
+                alert('數據載入失敗，請檢查網路連線或重新整理頁面。');
             }
         }
 
         async function fetchCSV(isSilent) {
-            if (!isSilent) document.getElementById('loading').classList.remove('opacity-0', 'pointer-events-none');
+            if (!isSilent) document.getElementById('loading').classList.remove('opacity-0', 'pointer-events-none', 'hidden');
             
             try {
-                const res = await fetch(CONFIG.CSV_URL);
-                if (!res.ok) throw new Error("Fetch failed");
+                // 設定 10 秒超時
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                
+                const res = await fetch(CONFIG.CSV_URL, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) throw new Error("Fetch failed: " + res.status);
                 const text = await res.text();
                 
                 Papa.parse(text, {
                     header: true,
                     skipEmptyLines: true,
                     complete: (result) => {
-                        // Raw processing logic similar to v2 but robust
-                        const processed = normalizeRawData(result.data);
-                        
-                        localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({
-                            timestamp: Date.now(),
-                            data: processed
-                        }));
-                        
-                        processData(processed);
-                        if (!isSilent) {
-                            const loader = document.getElementById('loading');
-                            loader.classList.add('opacity-0');
-                            setTimeout(() => loader.classList.add('hidden'), 500);
+                        try {
+                            // Raw processing logic similar to v2 but robust
+                            const processed = normalizeRawData(result.data);
+                            
+                            if (!processed || processed.length === 0) {
+                                throw new Error('無有有效數據');
+                            }
+                            
+                            localStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({
+                                timestamp: Date.now(),
+                                data: processed
+                            }));
+                            
+                            processData(processed);
+                            hideLoading();
+                            
+                            const now = new Date();
+                            document.getElementById('last-update').innerText = `更新: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+                        } catch(e) {
+                            console.error('處理數據錯誤:', e);
+                            if (!isSilent) {
+                                hideLoading();
+                                alert('處理數據時發生錯誤：' + e.message);
+                            }
                         }
-                        
-                        const now = new Date();
-                        document.getElementById('last-update').innerText = `更新: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
                     },
-                    error: (err) => { if(!isSilent) showError(err.message); }
+                    error: (err) => { 
+                        console.error('解析 CSV 錯誤:', err);
+                        if (!isSilent) {
+                            hideLoading();
+                            alert('CSV 檔案解析失敗');
+                        }
+                    }
                 });
             } catch (e) {
-                if(!isSilent) showError(e.message);
+                console.error('載入錯誤:', e);
+                if (!isSilent) {
+                    hideLoading();
+                    if (e.name === 'AbortError') {
+                        alert('載入超時，請檢查網路連線');
+                    } else {
+                        alert('無法載入數據，請稍後再試或重新整理頁面');
+                    }
+                }
+            }
+        }
+        
+        function hideLoading() {
+            const loader = document.getElementById('loading');
+            if (loader) {
+                loader.classList.add('opacity-0');
+                setTimeout(() => {
+                    loader.classList.add('hidden');
+                    loader.classList.add('pointer-events-none');
+                }, 500);
             }
         }
 
@@ -561,36 +1456,53 @@
         }
 
         function processData(data) {
-            STATE.allData = data;
-            // Calculate 7-day MA
-            for(let i=0; i<data.length; i++) {
-                let sum = 0, count = 0;
-                for(let k=0; k<7 && i-k>=0; k++) {
-                    const w = data[i-k].w_am || data[i-k].w_pm;
-                    if(w) { sum += w; count++; }
+            try {
+                // 合併本地新增的數據
+                STATE.allData = mergeLocalData(data);
+                
+                // Calculate 7-day MA
+                for(let i=0; i<STATE.allData.length; i++) {
+                    let sum = 0, count = 0;
+                    for(let k=0; k<7 && i-k>=0; k++) {
+                        const w = STATE.allData[i-k].w_am || STATE.allData[i-k].w_pm;
+                        if(w) { sum += w; count++; }
+                    }
+                    STATE.allData[i].w_ma7 = count > 0 ? sum/count : null;
                 }
-                data[i].w_ma7 = count > 0 ? sum/count : null;
+                
+                filterDate(STATE.filterRange);
+                renderKPIs();
+                calculateProgress();
+                updateBMIVisualization();
+                updateAchievements();
+                updateDailyMotivation();
+                updateQuickStats();
+                updateWeekComparison();
+                updateBestRecords();
+                updateFluctuationAnalysis();
+            } catch(e) {
+                console.error('處理數據錯誤:', e);
+                alert('處理數據時發生錯誤，請重新整理頁面');
             }
-            
-            filterDate(STATE.filterRange);
-            renderKPIs();
-            calculateProgress();
         }
 
         function filterDate(range) {
             STATE.filterRange = range;
             
-            // Update buttons style
+            // Update buttons style - 醫療風格
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 const text = btn.innerText;
-                const match = (range === 'ALL' && text.includes('全')) || (range === '1M' && text.includes('1')) || (range === '3M' && text.includes('3'));
+                const match = (range === 'ALL' && text.includes('全')) || 
+                              (range === '1W' && text.includes('7')) ||
+                              (range === '1M' && text.includes('30')) || 
+                              (range === '3M' && text.includes('90'));
                 
                 if (match) {
-                    btn.classList.add('bg-emerald-500', 'text-white', 'shadow-md', 'shadow-emerald-200');
-                    btn.classList.remove('text-slate-500', 'hover:bg-slate-50');
+                    btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                    btn.classList.remove('text-gray-600', 'hover:bg-blue-50', 'border-gray-200');
                 } else {
-                    btn.classList.remove('bg-emerald-500', 'text-white', 'shadow-md', 'shadow-emerald-200');
-                    btn.classList.add('text-slate-500', 'hover:bg-slate-50');
+                    btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                    btn.classList.add('text-gray-600', 'hover:bg-blue-50', 'border-gray-200');
                 }
             });
 
@@ -598,7 +1510,7 @@
             if (range === 'ALL') {
                 STATE.filteredData = STATE.allData;
             } else {
-                const days = range === '1M' ? 30 : 90;
+                const days = range === '1W' ? 7 : (range === '1M' ? 30 : 90);
                 const cutoff = new Date();
                 cutoff.setDate(cutoff.getDate() - days);
                 STATE.filteredData = STATE.allData.filter(d => new Date(d.date) >= cutoff);
@@ -606,6 +1518,10 @@
 
             renderCharts();
             renderTable();
+            updateQuickStats();  // 添加快速統計更新
+            updateWeekComparison();  // 添加週比較更新
+            updateBestRecords();  // 添加最佳紀錄更新
+            updateFluctuationAnalysis();  // 添加波動分析更新
         }
 
         // ------------------------------------------------
@@ -680,7 +1596,350 @@
                 const sbBar = document.getElementById('sidebar-progress-bar');
                 if (sbProgress) sbProgress.innerText = pct.toFixed(0) + '%';
                 if (sbBar) sbBar.style.width = pct + '%';
+                
+                // 更新體重變化對比卡片
+                updateWeightComparison(startWeight, cw);
+                
+                // 檢查是否達成目標，觸發慶祝
+                if (pct >= 100 && !window.celebrationTriggered) {
+                    triggerCelebration();
+                }
             }
+        }
+
+        function updateWeightComparison(start, current) {
+            const startEl = document.getElementById('weight-start');
+            const nowEl = document.getElementById('weight-now');
+            const lossEl = document.getElementById('total-loss');
+            const bodyIcon = document.getElementById('body-icon');
+            
+            if (startEl) startEl.innerText = start.toFixed(1);
+            if (nowEl) nowEl.innerText = current.toFixed(1);
+            
+            const loss = start - current;
+            if (lossEl) {
+                lossEl.innerHTML = loss > 0 
+                    ? `<i class="fas fa-arrow-down mr-1"></i>${loss.toFixed(1)} kg`
+                    : `<i class="fas fa-arrow-up mr-1"></i>${Math.abs(loss).toFixed(1)} kg`;
+            }
+            
+            // 根據減重程度改變圖示
+            if (bodyIcon) {
+                if (loss >= 10) bodyIcon.innerText = '🤸';
+                else if (loss >= 5) bodyIcon.innerText = '🚶';
+                else if (loss >= 2) bodyIcon.innerText = '🧍';
+                else bodyIcon.innerText = '🧍';
+            }
+        }
+
+        function updateBMIVisualization() {
+            const latest = STATE.allData[STATE.allData.length - 1];
+            if (!latest || !latest.w_am) return;
+            
+            const height = STATE.userSettings.height / 100;
+            const bmi = latest.w_am / (height * height);
+            
+            const bmiLarge = document.getElementById('bmi-large');
+            const bmiStatus = document.getElementById('bmi-status');
+            const bmiPointer = document.getElementById('bmi-pointer');
+            
+            if (bmiLarge) bmiLarge.innerText = bmi.toFixed(1);
+            
+            let status = '';
+            let statusColor = '';
+            let pointerPos = 0;
+            
+            if (bmi < 18.5) {
+                status = '體重過輕';
+                statusColor = 'text-blue-600';
+                pointerPos = (bmi / 18.5) * 18.5;
+            } else if (bmi < 24) {
+                status = '健康標準';
+                statusColor = 'text-emerald-600';
+                pointerPos = 18.5 + ((bmi - 18.5) / (24 - 18.5)) * 5.5;
+            } else if (bmi < 27) {
+                status = '體重過重';
+                statusColor = 'text-amber-600';
+                pointerPos = 24 + ((bmi - 24) / (27 - 24)) * 3;
+            } else {
+                status = '肥胖';
+                statusColor = 'text-rose-600';
+                pointerPos = 27 + Math.min((bmi - 27) / 10 * 73, 73);
+            }
+            
+            if (bmiStatus) {
+                bmiStatus.innerText = status;
+                bmiStatus.className = `text-sm font-bold mt-1 ${statusColor}`;
+            }
+            
+            if (bmiPointer) {
+                bmiPointer.style.left = `${pointerPos}%`;
+            }
+            
+            // 更新人體體態圖
+            updateBodyFigure(latest, bmi);
+        }
+
+        function updateBodyFigure(data, bmi) {
+            // 更新人體圖數據
+            const bodyWeight = document.getElementById('body-weight');
+            const bodyFat = document.getElementById('body-fat');
+            const bodyBmi = document.getElementById('body-bmi');
+            const bodyBmiStatus = document.getElementById('body-bmi-status');
+            const bodyMuscle = document.getElementById('body-muscle');
+            const bodyVisceral = document.getElementById('body-visceral');
+            const bodyProgress = document.getElementById('body-progress');
+            const bodyFigureBmi = document.getElementById('body-figure-bmi');
+            const healthScore = document.getElementById('health-score');
+            const healthGrade = document.getElementById('health-grade');
+            
+            if (bodyWeight) bodyWeight.innerText = data.w_am ? data.w_am.toFixed(1) : '-';
+            if (bodyFat) bodyFat.innerText = data.f_am ? data.f_am.toFixed(1) : '-';
+            if (bodyBmi) bodyBmi.innerText = bmi.toFixed(1);
+            if (bodyFigureBmi) bodyFigureBmi.innerText = bmi.toFixed(1);
+            if (bodyMuscle) bodyMuscle.innerText = data.m_am ? data.m_am.toFixed(1) : '-';
+            if (bodyVisceral) bodyVisceral.innerText = data.v || '-';
+            
+            // BMI 狀態
+            let bmiStatusText = '';
+            if (bmi < 18.5) bmiStatusText = '🧘 過輕';
+            else if (bmi < 24) bmiStatusText = '✅ 標準';
+            else if (bmi < 27) bmiStatusText = '⚠️ 過重';
+            else bmiStatusText = '🛑 肥胖';
+            if (bodyBmiStatus) bodyBmiStatus.innerText = bmiStatusText;
+            
+            // 達成率
+            if (STATE.allData.length > 0) {
+                const start = STATE.allData[0].w_am || STATE.allData[0].w_pm;
+                const goal = STATE.userSettings.goal;
+                if (start && data.w_am && goal) {
+                    const progress = Math.min(100, Math.max(0, ((start - data.w_am) / (start - goal)) * 100));
+                    if (bodyProgress) bodyProgress.innerText = progress.toFixed(0);
+                }
+            }
+            
+            // 計算健康評分 (0-100)
+            let score = 50; // 基礎分
+            
+            // BMI 評分 (30分)
+            if (bmi >= 18.5 && bmi < 24) score += 30;
+            else if (bmi >= 17 && bmi < 27) score += 20;
+            else if (bmi >= 16 && bmi < 28) score += 10;
+            
+            // 體脂率評分 (25分) - 男性標準
+            if (data.f_am) {
+                if (data.f_am >= 10 && data.f_am <= 20) score += 25;
+                else if (data.f_am >= 8 && data.f_am <= 25) score += 15;
+                else if (data.f_am >= 5 && data.f_am <= 30) score += 8;
+            }
+            
+            // 骨骼肌評分 (15分)
+            if (data.m_am) {
+                if (data.m_am >= 35) score += 15;
+                else if (data.m_am >= 30) score += 10;
+                else if (data.m_am >= 25) score += 5;
+            }
+            
+            // 內臟脂肪評分 (10分)
+            if (data.v) {
+                if (data.v <= 9) score += 10;
+                else if (data.v <= 14) score += 5;
+            }
+            
+            score = Math.min(100, Math.max(0, score));
+            
+            if (healthScore) {
+                healthScore.innerText = score.toFixed(0);
+                healthScore.classList.add('number-pop');
+                setTimeout(() => healthScore.classList.remove('number-pop'), 500);
+            }
+            
+            // 評級
+            let grade = '';
+            if (score >= 90) grade = 'S 級 - 完美！';
+            else if (score >= 80) grade = 'A 級 - 優秀！';
+            else if (score >= 70) grade = 'B 級 - 良好';
+            else if (score >= 60) grade = 'C 級 - 普通';
+            else grade = 'D 級 - 加油！';
+            
+            if (healthGrade) healthGrade.innerText = grade;
+        }
+
+        function updateDailyMotivation() {
+            try {
+                const motivations = [
+                    "💪 每一次堅持，都是對自己的承諾！",
+                    "🔥 今天的你，比昨天更強！",
+                    "⭐ 不要停下腳步，目標就在前方！",
+                    "🏆 你已經走了這麼遠，再堅持一下！",
+                    "✨ 相信自己，你可以做到！",
+                    "🎯 專注當下，享受過程！",
+                    "💎 每一滴汗水，都會成為明天的獎勵！",
+                    "🚀 突破舒適圈，挑戰更好的自己！",
+                    "🌟 改變從今天開始，堅持就是勝利！",
+                    "💫 你的努力，時間會給你答案！",
+                    "🔔 健康是最大的財富，加油！",
+                    "🎪 每天進步一點點，就是成功！",
+                    "🌈 風雨過後，必見彩虹！",
+                    "🎨 塑造理想的自己，從不放棄開始！",
+                    "🎭 今天的選擇，決定明天的自己！"
+                ];
+                
+                // 根據進度給予不同激勵
+                const latest = STATE.allData[STATE.allData.length - 1];
+                const start = STATE.allData[0];
+                if (latest && start && latest.w_am && start.w_am) {
+                    const progress = ((start.w_am - latest.w_am) / (start.w_am - STATE.userSettings.goal)) * 100;
+                    
+                    if (progress >= 100) {
+                        motivations.unshift("🎉 目標達成！你是最棒的！繼續保持！");
+                    } else if (progress >= 80) {
+                        motivations.unshift("🔥 離目標只差一步了！衝刺吧！");
+                    } else if (progress >= 50) {
+                        motivations.unshift("💪 已經完成一半了！繼續加油！");
+                    } else if (progress >= 20) {
+                        motivations.unshift("⭐ 好的開始！保持這個節奏！");
+                    } else {
+                        motivations.unshift("🚀 踏出第一步最重要！你很棒！");
+                    }
+                }
+                
+                const today = new Date().getDate();
+                const motivation = motivations[today % motivations.length];
+                const el = document.getElementById('daily-motivation');
+                if (el) el.innerText = motivation;
+            } catch(e) {
+                console.error('更新激勵語錯誤:', e);
+            }
+        }
+
+        function updateQuickStats() {
+            try {
+                const weeklyAvg = document.getElementById('weekly-avg');
+                const goalRemaining = document.getElementById('goal-remaining');
+                const estimatedDays = document.getElementById('estimated-days');
+                
+                console.log('快速統計 - 元素:', { weeklyAvg, goalRemaining, estimatedDays });
+                
+                if (STATE.allData.length < 2) {
+                    console.log('快速統計 - 數據不足:', STATE.allData.length);
+                    return;
+                }
+                
+                const latest = STATE.allData[STATE.allData.length - 1];
+                const start = STATE.allData[0];
+                
+                console.log('快速統計 - 數據:', { latest, start });
+                
+                // 使用任何可用的體重數據
+                const latestWeight = latest.w_am || latest.w_pm;
+                const startWeight = start.w_am || start.w_pm;
+                
+                if (!latestWeight || !startWeight) {
+                    console.log('快速統計 - 體重數據缺失', { latestWeight, startWeight });
+                    return;
+                }
+                
+                // 週平均減重
+                const days = STATE.allData.length;
+                const weeks = days / 7;
+                const totalLoss = startWeight - latestWeight;
+                const avgPerWeek = weeks > 0 ? totalLoss / weeks : 0;
+                console.log('快速統計 - 週平均:', avgPerWeek);
+                if (weeklyAvg) weeklyAvg.innerText = avgPerWeek >= 0 ? `${avgPerWeek.toFixed(2)} kg/週` : '+' + Math.abs(avgPerWeek).toFixed(2) + ' kg/週';
+                
+                // 距離目標
+                const remaining = latestWeight - STATE.userSettings.goal;
+                console.log('快速統計 - 距離目標:', remaining, '目標:', STATE.userSettings.goal);
+                if (goalRemaining) {
+                    if (remaining > 0) {
+                        goalRemaining.innerText = `${remaining.toFixed(1)} kg`;
+                    } else {
+                        goalRemaining.innerText = '✅ 已達成';
+                    }
+                }
+                
+                // 預計達標天數
+                if (estimatedDays && avgPerWeek > 0.1 && remaining > 0) {
+                    const weeksNeeded = remaining / avgPerWeek;
+                    const daysNeeded = Math.ceil(weeksNeeded * 7);
+                    
+                    console.log('快速統計 - 預計:', daysNeeded, '天');
+                    
+                    if (daysNeeded < 7) {
+                        estimatedDays.innerText = `${daysNeeded} 天`;
+                    } else if (daysNeeded < 60) {
+                        estimatedDays.innerText = `${Math.ceil(weeksNeeded)} 週`;
+                    } else {
+                        estimatedDays.innerText = `${Math.ceil(weeksNeeded / 4)} 個月`;
+                    }
+                } else if (estimatedDays) {
+                    estimatedDays.innerText = remaining <= 0 ? '🎉 已完成' : '計算中';
+                }
+            } catch(e) {
+                console.error('更新快速統計錯誤:', e);
+            }
+        }
+
+        function updateAchievements() {
+            const latest = STATE.allData[STATE.allData.length - 1];
+            const start = STATE.allData[0];
+            const days = STATE.allData.length;
+            
+            if (!latest || !start) return;
+            
+            const totalLoss = start.w_am - latest.w_am;
+            
+            const achievements = [
+                { icon: 'fa-calendar-check', emoji: '✓', title: '連續記錄', desc: '7天', unlocked: days >= 7, color: 'blue' },
+                { icon: 'fa-fire', emoji: '↓', title: '減重達成', desc: '2kg', unlocked: totalLoss >= 2, color: 'blue' },
+                { icon: 'fa-star', emoji: '★', title: '減重達成', desc: '5kg', unlocked: totalLoss >= 5, color: 'teal' },
+                { icon: 'fa-trophy', emoji: '◆', title: '減重達成', desc: '10kg', unlocked: totalLoss >= 10, color: 'green' },
+                { icon: 'fa-chart-line', emoji: '✓', title: '持續追蹤', desc: '30天', unlocked: days >= 30, color: 'blue' },
+                { icon: 'fa-medal', emoji: '★', title: '堅持不懈', desc: '90天', unlocked: days >= 90, color: 'teal' }
+            ];
+            
+            const container = document.getElementById('achievements');
+            if (!container) return;
+            
+            container.innerHTML = achievements.map(a => `
+                <div class="badge-item text-center p-4 rounded-lg ${
+                    a.unlocked ? `bg-${a.color}-50 border-${a.color}-200` : 'bg-gray-50 border-gray-200'
+                } border transition-all cursor-pointer relative overflow-hidden" title="${a.title} ${a.desc}">
+                    ${a.unlocked ? `<div class="absolute top-1 right-1 w-4 h-4 bg-${a.color}-500 rounded-full flex items-center justify-center"><i class="fas fa-check text-white text-xs"></i></div>` : ''}
+                    <div class="text-3xl mb-2 ${a.unlocked ? `text-${a.color}-600` : 'text-gray-300'}">${a.emoji}</div>
+                    <p class="text-xs font-medium ${a.unlocked ? `text-${a.color}-700` : 'text-gray-400'}">${a.desc}</p>
+                </div>
+            `).join('');
+        }
+
+        function triggerCelebration() {
+            // 避免重複觸發
+            window.celebrationTriggered = true;
+            
+            // 產生彩紙 - 醫療藍色系
+            const colors = ['#2563EB', '#3B82F6', '#0891B2', '#06B6D4', '#059669', '#10B981'];
+            for (let i = 0; i < 80; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDelay = Math.random() * 0.5 + 's';
+                    confetti.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                    confetti.style.width = (Math.random() * 10 + 8) + 'px';
+                    confetti.style.height = (Math.random() * 10 + 8) + 'px';
+                    confetti.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+                    document.body.appendChild(confetti);
+                    
+                    setTimeout(() => confetti.remove(), 5000);
+                }, i * 25);
+            }
+            
+            // 顯示祝賀訊息
+            setTimeout(() => {
+                alert('🎉 恭喜！您已達成目標體重！\n繼續保持健康的生活方式！');
+            }, 1000);
         }
 
         function renderTrend(elId, curr, start, isHigherBetter) {
@@ -746,7 +2005,29 @@
                         cornerRadius: 8,
                         displayColors: true,
                         callbacks: {
-                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y}`
+                            label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y}`,
+                            footer: (items) => {
+                                return '滾輪縮放 | 拖曳平移 | 雙擊重置';
+                            }
+                        }
+                    },
+                    zoom: {
+                        zoom: {
+                            wheel: {
+                                enabled: true,
+                                speed: 0.1
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'x'
+                        },
+                        pan: {
+                            enabled: true,
+                            mode: 'x'
+                        },
+                        limits: {
+                            x: { min: 'original', max: 'original' }
                         }
                     }
                 },
@@ -871,6 +2152,16 @@
             STATE.charts[id] = new Chart(ctx, { type: 'line', data: data, options: options });
         }
 
+        // 重置所有圖表縮放
+        function resetAllCharts() {
+            Object.values(STATE.charts).forEach(chart => {
+                if (chart && chart.resetZoom) {
+                    chart.resetZoom();
+                }
+            });
+            showToast('圖表已重置', 'info');
+        }
+
         // ------------------------------------------------
         // 6. 表格邏輯 (Table)
         // ------------------------------------------------
@@ -912,8 +2203,9 @@
                 return STATE.sort.order === 'asc' ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
             });
 
-            // Take top 15
-            const pageData = displayData.slice(0, 15);
+            // Apply row limit
+            const rowLimit = STATE.tableRowLimit === 'all' ? displayData.length : parseInt(STATE.tableRowLimit);
+            const pageData = displayData.slice(0, rowLimit);
 
             pageData.forEach(row => {
                 // Find trend compared to previous day (needs logic search since we sorted)
@@ -940,15 +2232,621 @@
                 }
 
                 tr.innerHTML = `
-                    <td class="px-6 py-4 font-medium text-slate-600">${row.date.slice(5)}</td>
-                    <td class="px-6 py-4 ${wColor}">${row.w_am ? row.w_am.toFixed(1) : '-'}</td>
-                    <td class="px-6 py-4 text-amber-600">${row.f_am ? row.f_am.toFixed(1) + '%' : '-'}</td>
-                    <td class="px-6 py-4 text-rose-600">${row.m_am ? row.m_am.toFixed(1) + '%' : '-'}</td>
-                    <td class="px-6 py-4 text-indigo-600 font-medium">${row.v || '-'}</td>
-                    <td class="px-6 py-4 text-right">${trendHtml}</td>
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 font-medium text-slate-600 text-xs sm:text-sm whitespace-nowrap">${row.date.slice(5)}</td>
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 ${wColor} text-xs sm:text-sm">${row.w_am ? row.w_am.toFixed(1) : '-'}</td>
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 text-amber-600 text-xs sm:text-sm">${row.f_am ? row.f_am.toFixed(1) + '%' : '-'}</td>
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 text-rose-600 text-xs sm:text-sm">${row.m_am ? row.m_am.toFixed(1) + '%' : '-'}</td>
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 text-indigo-600 font-medium text-xs sm:text-sm">${row.v || '-'}</td>
+                    <td class="px-3 sm:px-6 py-3 sm:py-4 text-right">${trendHtml}</td>
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // ------------------------------------------------
+        // 新增功能: CSV 匯出
+        // ------------------------------------------------
+        function exportCSV() {
+            const data = STATE.filteredData;
+            if (!data || data.length === 0) {
+                alert('無資料可匯出！');
+                return;
+            }
+
+            // CSV header
+            let csv = '日期,體重(早),體重(晚),體脂率,肌肉率,內臟脂肪\n';
+            
+            // CSV rows
+            data.forEach(row => {
+                csv += `${row.date},${row.w_am || ''},${row.w_pm || ''},${row.f_am || ''},${row.m_am || ''},${row.v || ''}\n`;
+            });
+
+            // Download
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `體重數據_${new Date().toISOString().slice(0,10)}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // ------------------------------------------------
+        // 新增功能: PDF 報告匯出
+        // ------------------------------------------------
+        async function exportPDF() {
+            if (!window.jspdf || !window.html2canvas) {
+                alert('PDF 套件載入中，請稍後再試...');
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            
+            try {
+                // 顯示載入提示
+                const loadingDiv = document.createElement('div');
+                loadingDiv.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center';
+                loadingDiv.innerHTML = '<div class="bg-white p-6 rounded-lg shadow-xl"><i class="fas fa-spinner fa-spin text-blue-600 text-3xl mb-3"></i><p class="text-gray-700 font-medium">正在生成 PDF 報告...</p></div>';
+                document.body.appendChild(loadingDiv);
+
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                let yPosition = 20;
+
+                // 標題
+                pdf.setFontSize(20);
+                pdf.setTextColor(37, 99, 235); // blue-600
+                pdf.text('HealthTrack 體重管理報告', pageWidth / 2, yPosition, { align: 'center' });
+                
+                yPosition += 10;
+                pdf.setFontSize(10);
+                pdf.setTextColor(107, 114, 128); // gray-500
+                pdf.text(`生成日期: ${new Date().toLocaleDateString('zh-TW')}`, pageWidth / 2, yPosition, { align: 'center' });
+                
+                yPosition += 15;
+
+                // KPI 卡片截圖
+                const kpiSection = document.querySelector('#dashboard').nextElementSibling;
+                if (kpiSection) {
+                    const canvas = await html2canvas(kpiSection, { scale: 2, backgroundColor: '#ffffff' });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgWidth = pageWidth - 20;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    if (yPosition + imgHeight > pageHeight - 20) {
+                        pdf.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    pdf.addImage(imgData, 'PNG', 10, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 10;
+                }
+
+                // 圖表截圖
+                const chartsSection = document.getElementById('charts-section');
+                if (chartsSection) {
+                    if (yPosition > pageHeight - 100) {
+                        pdf.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    pdf.setFontSize(14);
+                    pdf.setTextColor(17, 24, 39); // gray-900
+                    pdf.text('趨勢圖表', 10, yPosition);
+                    yPosition += 10;
+                    
+                    const canvas = await html2canvas(chartsSection, { scale: 1.5, backgroundColor: '#ffffff' });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgWidth = pageWidth - 20;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    if (yPosition + imgHeight > pageHeight - 20) {
+                        pdf.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    pdf.addImage(imgData, 'PNG', 10, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 10;
+                }
+
+                // 週比較和統計數據
+                const weekSection = document.getElementById('week-comparison')?.closest('.medical-card');
+                if (weekSection) {
+                    pdf.addPage();
+                    yPosition = 20;
+                    
+                    const canvas = await html2canvas(weekSection, { scale: 2, backgroundColor: '#ffffff' });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgWidth = pageWidth - 20;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    pdf.addImage(imgData, 'PNG', 10, yPosition, imgWidth, imgHeight);
+                    yPosition += imgHeight + 10;
+                }
+
+                // 數據表格
+                const data = STATE.filteredData.slice(0, 30); // 只取前 30 筆
+                if (data.length > 0) {
+                    if (yPosition > pageHeight - 80) {
+                        pdf.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    pdf.setFontSize(14);
+                    pdf.setTextColor(17, 24, 39);
+                    pdf.text('數據明細 (前 30 筆)', 10, yPosition);
+                    yPosition += 8;
+                    
+                    pdf.setFontSize(8);
+                    pdf.setTextColor(107, 114, 128);
+                    
+                    // 表格標題
+                    const headers = ['日期', '體重', '體脂', '肌肉', '內臟'];
+                    const colWidth = (pageWidth - 20) / 5;
+                    headers.forEach((header, i) => {
+                        pdf.text(header, 10 + i * colWidth, yPosition);
+                    });
+                    yPosition += 6;
+                    
+                    // 表格數據
+                    data.forEach(row => {
+                        if (yPosition > pageHeight - 15) {
+                            pdf.addPage();
+                            yPosition = 20;
+                        }
+                        
+                        pdf.setTextColor(55, 65, 81);
+                        pdf.text(row.date.slice(5), 10, yPosition);
+                        pdf.text(row.w_am ? row.w_am.toFixed(1) : '-', 10 + colWidth, yPosition);
+                        pdf.text(row.f_am ? row.f_am.toFixed(1) + '%' : '-', 10 + colWidth * 2, yPosition);
+                        pdf.text(row.m_am ? row.m_am.toFixed(1) + '%' : '-', 10 + colWidth * 3, yPosition);
+                        pdf.text(row.v ? row.v.toString() : '-', 10 + colWidth * 4, yPosition);
+                        yPosition += 5;
+                    });
+                }
+
+                // 下載 PDF
+                pdf.save(`HealthTrack報告_${new Date().toISOString().slice(0,10)}.pdf`);
+                
+                // 移除載入提示
+                document.body.removeChild(loadingDiv);
+                
+            } catch (error) {
+                console.error('PDF 生成失敗:', error);
+                alert('PDF 生成失敗，請重試');
+                const loadingDiv = document.querySelector('.fixed.inset-0.bg-black\\/50');
+                if (loadingDiv) document.body.removeChild(loadingDiv);
+            }
+        }
+
+        // ------------------------------------------------
+        // 新增功能: 表格筆數選擇器
+        // ------------------------------------------------
+        function updateTableRows() {
+            const select = document.getElementById('table-rows');
+            STATE.tableRowLimit = select.value;
+            renderTable();
+        }
+
+        // ------------------------------------------------
+        // 新增功能: 深色模式切換
+        // ------------------------------------------------
+        function toggleDarkMode() {
+            STATE.darkMode = !STATE.darkMode;
+            localStorage.setItem('darkMode', STATE.darkMode);
+            
+            if (STATE.darkMode) {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon').classList.replace('fa-moon', 'fa-sun');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.getElementById('theme-icon').classList.replace('fa-sun', 'fa-moon');
+            }
+        }
+
+        // ------------------------------------------------
+        // 新增功能: 每日提醒
+        // ------------------------------------------------
+        function initReminder() {
+            const reminderEnabled = localStorage.getItem('reminderEnabled') === 'true';
+            const reminderTime = localStorage.getItem('reminderTime') || '09:00';
+            
+            document.getElementById('reminder-time').value = reminderTime;
+            
+            if (reminderEnabled) {
+                const toggle = document.getElementById('reminder-toggle');
+                toggle.classList.remove('bg-gray-300');
+                toggle.classList.add('bg-blue-600');
+                toggle.querySelector('span').classList.remove('translate-x-1');
+                toggle.querySelector('span').classList.add('translate-x-6');
+                document.getElementById('reminder-time-picker').classList.remove('hidden');
+                
+                // 檢查通知權限
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    scheduleReminder();
+                }
+            }
+        }
+
+        async function toggleReminder() {
+            const toggle = document.getElementById('reminder-toggle');
+            const timePicker = document.getElementById('reminder-time-picker');
+            const isEnabled = toggle.classList.contains('bg-blue-600');
+            
+            if (!isEnabled) {
+                // 啟用提醒
+                if ('Notification' in window) {
+                    const permission = await Notification.requestPermission();
+                    if (permission === 'granted') {
+                        toggle.classList.remove('bg-gray-300');
+                        toggle.classList.add('bg-blue-600');
+                        toggle.querySelector('span').classList.remove('translate-x-1');
+                        toggle.querySelector('span').classList.add('translate-x-6');
+                        timePicker.classList.remove('hidden');
+                        localStorage.setItem('reminderEnabled', 'true');
+                        scheduleReminder();
+                        
+                        // 顯示測試通知
+                        new Notification('HealthTrack 提醒已啟用', {
+                            body: '我們會在設定的時間提醒您記錄體重',
+                            icon: 'https://via.placeholder.com/128/2563EB/ffffff?text=HT'
+                        });
+                    } else {
+                        alert('請允許通知權限以啟用提醒功能');
+                    }
+                } else {
+                    alert('您的瀏覽器不支援通知功能');
+                }
+            } else {
+                // 停用提醒
+                toggle.classList.remove('bg-blue-600');
+                toggle.classList.add('bg-gray-300');
+                toggle.querySelector('span').classList.remove('translate-x-6');
+                toggle.querySelector('span').classList.add('translate-x-1');
+                timePicker.classList.add('hidden');
+                localStorage.setItem('reminderEnabled', 'false');
+                cancelReminder();
+            }
+        }
+
+        function scheduleReminder() {
+            const reminderTime = document.getElementById('reminder-time').value;
+            localStorage.setItem('reminderTime', reminderTime);
+            
+            // 計算下次提醒時間
+            const [hours, minutes] = reminderTime.split(':');
+            const now = new Date();
+            let next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(hours), parseInt(minutes), 0);
+            
+            if (next <= now) {
+                next.setDate(next.getDate() + 1);
+            }
+            
+            const timeUntilReminder = next.getTime() - now.getTime();
+            
+            // 設定定時器
+            if (window.reminderTimeout) clearTimeout(window.reminderTimeout);
+            window.reminderTimeout = setTimeout(() => {
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification('HealthTrack 每日提醒', {
+                        body: '別忘了記錄今天的體重數據！',
+                        icon: 'https://via.placeholder.com/128/2563EB/ffffff?text=HT',
+                        requireInteraction: true
+                    });
+                }
+                // 設定下一次提醒（24小時後）
+                scheduleReminder();
+            }, timeUntilReminder);
+        }
+
+        function cancelReminder() {
+            if (window.reminderTimeout) {
+                clearTimeout(window.reminderTimeout);
+                window.reminderTimeout = null;
+            }
+        }
+
+        // 當時間選擇器變更時，更新提醒時間
+        document.addEventListener('DOMContentLoaded', () => {
+            const timeInput = document.getElementById('reminder-time');
+            if (timeInput) {
+                timeInput.addEventListener('change', () => {
+                    if (localStorage.getItem('reminderEnabled') === 'true') {
+                        scheduleReminder();
+                    }
+                });
+            }
+        });
+
+        // ------------------------------------------------
+        // 新增功能: 週比較分析
+        // ------------------------------------------------
+        function updateWeekComparison() {
+            const container = document.getElementById('week-comparison');
+            const data = STATE.filteredData;
+            
+            if (!data || data.length < 14) {
+                container.innerHTML = '<p class="text-sm text-gray-500 col-span-full">資料不足，至少需要 14 天數據</p>';
+                return;
+            }
+
+            // Get this week (last 7 days) and last week (7-14 days ago)
+            const thisWeek = data.slice(0, 7).filter(d => d.w_am || d.w_pm);
+            const lastWeek = data.slice(7, 14).filter(d => d.w_am || d.w_pm);
+
+            console.log('週比較分析 - 本週數據:', thisWeek);
+            console.log('週比較分析 - 上週數據:', lastWeek);
+
+            if (thisWeek.length === 0 || lastWeek.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500 col-span-full">週數據不完整</p>';
+                return;
+            }
+
+            // Calculate averages (只計算有效數據)
+            const calcAvg = (arr, field) => {
+                const valid = arr.filter(d => d[field] && d[field] > 0);
+                if (valid.length === 0) return 0;
+                return valid.reduce((sum, d) => sum + d[field], 0) / valid.length;
+            };
+
+            const thisWeekAvg = {
+                weight: calcAvg(thisWeek.map(d => ({ w: d.w_am || d.w_pm })), 'w'),
+                fat: calcAvg(thisWeek, 'f_am'),
+                muscle: calcAvg(thisWeek, 'm_am'),
+                visceral: calcAvg(thisWeek, 'v')
+            };
+
+            const lastWeekAvg = {
+                weight: calcAvg(lastWeek.map(d => ({ w: d.w_am || d.w_pm })), 'w'),
+                fat: calcAvg(lastWeek, 'f_am'),
+                muscle: calcAvg(lastWeek, 'm_am'),
+                visceral: calcAvg(lastWeek, 'v')
+            };
+
+            // Calculate differences (上週 - 本週，正數表示減少)
+            const diffs = {
+                weight: lastWeekAvg.weight - thisWeekAvg.weight,
+                fat: lastWeekAvg.fat - thisWeekAvg.fat,
+                muscle: lastWeekAvg.muscle - thisWeekAvg.muscle,
+                visceral: lastWeekAvg.visceral - thisWeekAvg.visceral
+            };
+
+            console.log('週比較分析 - 本週平均:', thisWeekAvg);
+            console.log('週比較分析 - 上週平均:', lastWeekAvg);
+            console.log('週比較分析 - 變化量 (上週-本週):', diffs);
+
+            // Render comparison cards
+            const metrics = [
+                { label: '體重', key: 'weight', unit: 'kg', lowerBetter: true, icon: 'fa-weight', color: 'blue' },
+                { label: '體脂率', key: 'fat', unit: '%', lowerBetter: true, icon: 'fa-percentage', color: 'amber' },
+                { label: '肌肉率', key: 'muscle', unit: '%', lowerBetter: false, icon: 'fa-dumbbell', color: 'rose' },
+                { label: '內臟脂肪', key: 'visceral', unit: '', lowerBetter: true, icon: 'fa-heart-pulse', color: 'indigo' }
+            ];
+
+            container.innerHTML = metrics.map(m => {
+                const diff = diffs[m.key];
+                const thisVal = thisWeekAvg[m.key];
+                const lastVal = lastWeekAvg[m.key];
+                
+                let trendIcon = 'fa-minus';
+                let trendColor = 'text-gray-400';
+                let trendText = '持平';
+                
+                if (Math.abs(diff) > 0.1) {
+                    if (m.lowerBetter) {
+                        // 體重、體脂、內臟脂肪：負數表示本週較輕 = 減少 = 好
+                        if (diff < 0) {
+                            trendIcon = 'fa-arrow-down';
+                            trendColor = 'text-green-600';
+                            trendText = '減少';
+                        } else {
+                            trendIcon = 'fa-arrow-up';
+                            trendColor = 'text-red-600';
+                            trendText = '增加';
+                        }
+                    } else {
+                        // 肌肉率：負數表示本週較低 = 減少 = 壞
+                        if (diff < 0) {
+                            trendIcon = 'fa-arrow-down';
+                            trendColor = 'text-red-600';
+                            trendText = '減少';
+                        } else {
+                            trendIcon = 'fa-arrow-up';
+                            trendColor = 'text-green-600';
+                            trendText = '增加';
+                        }
+                    }
+                }
+
+                return `
+                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-100">
+                        <div class="flex items-center gap-2 mb-3">
+                            <i class="far ${m.icon} text-${m.color}-600"></i>
+                            <span class="text-sm font-semibold text-gray-700">${m.label}</span>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-500">本週平均</span>
+                                <span class="text-lg font-bold text-gray-900">${thisVal.toFixed(1)}${m.unit}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-xs text-gray-500">上週平均</span>
+                                <span class="text-sm text-gray-600">${lastVal.toFixed(1)}${m.unit}</span>
+                            </div>
+                            <div class="pt-2 border-t border-gray-200 flex justify-between items-center">
+                                <span class="text-xs ${trendColor} font-semibold flex items-center gap-1">
+                                    <i class="fas ${trendIcon}"></i> ${trendText}
+                                </span>
+                                <span class="text-sm font-bold ${trendColor}">${Math.abs(diff).toFixed(1)}${m.unit}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ------------------------------------------------
+        // 新增功能: 最佳紀錄統計
+        // ------------------------------------------------
+        function updateBestRecords() {
+            const container = document.getElementById('best-records');
+            const data = STATE.filteredData;
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-500">暫無數據</p>';
+                return;
+            }
+
+            // 找出最佳與最差紀錄
+            const validWeights = data.filter(d => d.w_am || d.w_pm);
+            const validFats = data.filter(d => d.f_am && d.f_am > 0);
+            const validMuscles = data.filter(d => d.m_am && d.m_am > 0);
+            
+            const lowestWeight = validWeights.length > 0 
+                ? validWeights.reduce((min, d) => {
+                    const w = d.w_am || d.w_pm;
+                    return w < (min.w_am || min.w_pm) ? d : min;
+                }) : null;
+                
+            const highestWeight = validWeights.length > 0 
+                ? validWeights.reduce((max, d) => {
+                    const w = d.w_am || d.w_pm;
+                    return w > (max.w_am || max.w_pm) ? d : max;
+                }) : null;
+
+            const lowestFat = validFats.length > 0 
+                ? validFats.reduce((min, d) => d.f_am < min.f_am ? d : min) 
+                : null;
+
+            const highestMuscle = validMuscles.length > 0 
+                ? validMuscles.reduce((max, d) => d.m_am > max.m_am ? d : max) 
+                : null;
+
+            const records = [
+                { 
+                    label: '最低體重', 
+                    value: lowestWeight ? `${(lowestWeight.w_am || lowestWeight.w_pm).toFixed(1)} kg` : '-',
+                    date: lowestWeight ? lowestWeight.date : '',
+                    icon: 'fa-arrow-down',
+                    color: 'green'
+                },
+                { 
+                    label: '最高體重', 
+                    value: highestWeight ? `${(highestWeight.w_am || highestWeight.w_pm).toFixed(1)} kg` : '-',
+                    date: highestWeight ? highestWeight.date : '',
+                    icon: 'fa-arrow-up',
+                    color: 'red'
+                },
+                { 
+                    label: '最低體脂率', 
+                    value: lowestFat ? `${lowestFat.f_am.toFixed(1)}%` : '-',
+                    date: lowestFat ? lowestFat.date : '',
+                    icon: 'fa-star',
+                    color: 'amber'
+                },
+                { 
+                    label: '最高肌肉率', 
+                    value: highestMuscle ? `${highestMuscle.m_am.toFixed(1)}%` : '-',
+                    date: highestMuscle ? highestMuscle.date : '',
+                    icon: 'fa-trophy',
+                    color: 'blue'
+                }
+            ];
+
+            container.innerHTML = records.map(r => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-${r.color}-100 flex items-center justify-center">
+                            <i class="fas ${r.icon} text-${r.color}-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">${r.label}</p>
+                            <p class="text-sm font-bold text-gray-900">${r.value}</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-400">${r.date ? r.date.slice(5) : ''}</span>
+                </div>
+            `).join('');
+        }
+
+        // ------------------------------------------------
+        // 新增功能: 波動分析
+        // ------------------------------------------------
+        function updateFluctuationAnalysis() {
+            const container = document.getElementById('fluctuation-analysis');
+            const data = STATE.filteredData;
+            
+            if (!data || data.length < 7) {
+                container.innerHTML = '<p class="text-sm text-gray-500">資料不足，需要至少 7 天數據</p>';
+                return;
+            }
+
+            // 計算波動度（標準差）
+            const calcStdDev = (arr, field) => {
+                const valid = arr.filter(d => d[field] && d[field] > 0);
+                if (valid.length < 2) return 0;
+                
+                const mean = valid.reduce((sum, d) => sum + d[field], 0) / valid.length;
+                const variance = valid.reduce((sum, d) => sum + Math.pow(d[field] - mean, 2), 0) / valid.length;
+                return Math.sqrt(variance);
+            };
+
+            const weightData = data.filter(d => d.w_am || d.w_pm).map(d => ({ w: d.w_am || d.w_pm }));
+            const weightStdDev = calcStdDev(weightData, 'w');
+            const fatStdDev = calcStdDev(data, 'f_am');
+            const muscleStdDev = calcStdDev(data, 'm_am');
+
+            // 計算最大單日變化
+            let maxWeightChange = 0;
+            for (let i = 1; i < data.length; i++) {
+                const curr = data[i].w_am || data[i].w_pm;
+                const prev = data[i-1].w_am || data[i-1].w_pm;
+                if (curr && prev) {
+                    const change = Math.abs(curr - prev);
+                    if (change > maxWeightChange) maxWeightChange = change;
+                }
+            }
+
+            // 計算連續下降天數
+            let currentStreak = 0;
+            let maxStreak = 0;
+            for (let i = 1; i < data.length; i++) {
+                const curr = data[i].w_am || data[i].w_pm;
+                const prev = data[i-1].w_am || data[i-1].w_pm;
+                if (curr && prev) {
+                    if (curr < prev) {
+                        currentStreak++;
+                        maxStreak = Math.max(maxStreak, currentStreak);
+                    } else {
+                        currentStreak = 0;
+                    }
+                }
+            }
+
+            const metrics = [
+                { label: '體重波動度', value: weightStdDev.toFixed(2) + ' kg', icon: 'fa-wave-square', color: 'blue', desc: '標準差' },
+                { label: '體脂波動度', value: fatStdDev.toFixed(2) + '%', icon: 'fa-chart-area', color: 'amber', desc: '標準差' },
+                { label: '最大單日變化', value: maxWeightChange.toFixed(1) + ' kg', icon: 'fa-bolt', color: 'red', desc: '體重' },
+                { label: '最長連降紀錄', value: maxStreak + ' 天', icon: 'fa-fire', color: 'green', desc: '連續下降' }
+            ];
+
+            container.innerHTML = metrics.map(m => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-${m.color}-100 flex items-center justify-center">
+                            <i class="fas ${m.icon} text-${m.color}-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500 font-medium">${m.label}</p>
+                            <p class="text-sm font-bold text-gray-900">${m.value}</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-gray-400">${m.desc}</span>
+                </div>
+            `).join('');
         }
 
         // Utils

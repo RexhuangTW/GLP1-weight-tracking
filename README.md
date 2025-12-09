@@ -1,236 +1,346 @@
-# GLP1 Weight Tracking 
+# 🏥 GLP-1 體重追蹤系統 v2.0
 
-用一份 **數據源檔案**（CSV 或 Excel） + 一支 **Python 產生器**，自動輸出每週的：
+> 現代化醫療風格的體重管理儀表板，提供完整的身體組成分析與視覺化工具
 
-- `weekly/<YYYY-CWNN>_weight_tracking.xlsx`
-- `reports/<YYYY-CWNN>/<YYYY-CWNN>_weekly_report.md`
-- `reports/<YYYY-CWNN>/<YYYY-CWNN>_weight_trend.png`
-- `reports/<YYYY-CWNN>/<YYYY-CWNN>_bodyfat_trend.png`
-
-> 以 `--anchor-date` 指定的日期作為每週的第一天；預設 anchor 為 `2025-08-15`（可改）。
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)](https://github.com/RexhuangTW/GLP1-weight-tracking)
+[![Status](https://img.shields.io/badge/status-active-success.svg)]()
 
 ---
 
-## 📂 專案結構
+## 📖 專案簡介
+
+GLP-1 體重追蹤系統是一個完全基於 Web 的單頁應用程式，專為使用 GLP-1 藥物進行體重管理的使用者設計。本系統提供專業的醫療風格介面，整合 Google Sheets 資料來源，實現即時的體重、體脂、肌肉率和內臟脂肪追蹤與分析。
+
+### ✨ 核心特色
+
+- 🎨 **專業醫療風格** - 簡潔的藍白配色，符合醫療專業形象
+- 📊 **互動式圖表** - 支援縮放、拖曳、即時篩選的視覺化分析
+- 📱 **完全響應式** - 手機、平板、桌面全平台優化
+- 💾 **離線支援** - Service Worker 實現離線瀏覽功能
+- 🔔 **每日提醒** - 可設定每日推送通知提醒記錄體重
+- 📥 **多格式匯出** - 支援 CSV 和 PDF 報告匯出
+- 🌓 **深色模式** - 自動儲存的主題偏好設定
+
+---
+
+## 🚀 快速開始
+
+### 線上使用
+
+直接開啟 `index.html` 檔案即可使用，或部署到任何靜態網站託管服務：
+
+```bash
+# 使用 Python 本地測試
+python3 -m http.server 8000
+
+# 或使用 Node.js
+npx serve
+
+# 瀏覽器開啟
+open http://localhost:8000
+```
+
+### 資料來源設定
+
+1. 準備 Google Sheets 試算表，包含以下欄位：
+   - `date` - 日期（格式：YYYY-MM-DD）
+   - `w_am` - 早上體重
+   - `w_pm` - 晚上體重
+   - `f_am` - 早上體脂率
+   - `m_am` - 早上肌肉率
+   - `v` - 內臟脂肪
+
+2. 將試算表發佈為 CSV 格式：
+   - 檔案 → 共用 → 發佈到網路
+   - 選擇「逗號分隔值 (.csv)」
+   - 複製發佈的 URL
+
+3. 在應用程式中設定：
+   - 點擊左側選單的「設定」
+   - 將 CSV URL 貼上到「資料來源 URL」欄位
+   - 點擊「儲存設定」
+
+---
+
+## 📊 功能說明
+
+### Phase 1 - 核心功能
+
+#### 📥 CSV 資料匯出
+一鍵匯出所有歷史數據為標準 CSV 格式，方便進行後續分析或備份。
+
+#### 📋 表格筆數選擇器
+彈性顯示表格資料：
+- 15 筆 - 快速瀏覽最近紀錄
+- 30 筆 - 一個月的數據
+- 50 筆 - 詳細歷史
+- 全部 - 完整資料集
+
+#### 🌓 深色模式
+支援深色與淺色主題切換，自動儲存使用者偏好，保護眼睛降低疲勞。
+
+#### 📈 週比較分析
+自動計算本週與上週的數據對比：
+- 體重變化趨勢
+- 體脂率增減
+- 肌肉率變化
+- 內臟脂肪對比
+- 視覺化增減指標（🟢 減少 / 🔴 增加）
+
+### Phase 2 - 進階功能
+
+#### 🎯 進階目標設定
+除了體重目標外，新增：
+- **體脂率目標** - 設定理想體脂範圍
+- **BMI 目標** - 設定目標 BMI 值
+- 即時顯示與目標的差距
+
+#### 🏆 最佳紀錄統計
+自動追蹤並顯示：
+- 💚 **最低體重** - 歷史最佳紀錄
+- 🔴 **最高體重** - 起始點參考
+- 💛 **最低體脂率** - 體脂管理成果
+- 💪 **最高肌肉率** - 肌肉量巔峰
+
+#### 📊 波動分析
+深入分析數據穩定性：
+- **體重波動度** - 標準差計算
+- **體脂波動度** - 變化趨勢分析
+- **最大單日變化** - 異常值偵測
+- **最長連降紀錄** - 持續進步天數
+
+#### 📱 響應式優化
+大幅改善手機版使用體驗：
+- 2 欄網格佈局（手機）
+- 4 欄網格佈局（桌面）
+- 自適應字體大小
+- 觸控優化的互動元素
+
+### Phase 3 - 高級功能
+
+#### 📄 PDF 報告匯出
+使用 jsPDF 和 html2canvas 生成專業 PDF 報告：
+- 完整的視覺化圖表
+- 統計數據摘要
+- 自動分頁處理
+- 高解析度輸出
+
+#### ✏️ 數據輸入/編輯
+本地數據管理功能：
+- 新增體重紀錄
+- 編輯現有數據
+- LocalStorage 儲存
+- 與 Google Sheets 資料合併顯示
+
+#### 🔔 每日提醒
+設定每日推送通知：
+- 自訂提醒時間
+- 瀏覽器通知 API
+- 持久化設定
+- 一鍵開關
+
+#### 📴 離線支援
+Service Worker 實現離線功能：
+- 離線瀏覽歷史數據
+- 快取關鍵資源
+- 自動更新機制
+- 漸進式 Web App
+
+#### 🔍 圖表互動增強
+Chart.js 進階功能：
+- **滾輪縮放** - 精確查看數據細節
+- **拖曳平移** - 瀏覽不同時間區段
+- **雙擊重置** - 快速回到預設視圖
+- **一鍵重置** - 重置所有圖表縮放
+
+---
+
+## 🛠️ 技術架構
+
+### 前端技術棧
+
+| 技術 | 版本 | 用途 |
+|------|------|------|
+| **Tailwind CSS** | 3.4.0 | 實用優先的 CSS 框架 |
+| **Chart.js** | 4.4.0 | 互動式圖表繪製 |
+| **chartjs-adapter-date-fns** | 3.0.0 | 時間軸格式化 |
+| **chartjs-plugin-zoom** | 2.0.1 | 圖表縮放功能 |
+| **PapaParse** | 5.4.1 | CSV 解析 |
+| **jsPDF** | 2.5.1 | PDF 文件生成 |
+| **html2canvas** | 1.4.1 | HTML 轉圖片 |
+| **Font Awesome** | 6.4.0 | 圖示庫 |
+
+### 核心特性
+
+- ✅ **單一檔案架構** - 2855 行完整功能
+- ✅ **無需建置工具** - 直接開啟即可使用
+- ✅ **CDN 載入** - 所有依賴透過 CDN
+- ✅ **LocalStorage** - 30 分鐘快取機制
+- ✅ **Service Worker** - 離線支援
+- ✅ **Notification API** - 推送通知
+- ✅ **Google Sheets API** - 即時資料同步
+
+### 資料流程
+
+```
+Google Sheets (CSV 發佈)
+    ↓
+PapaParse 解析
+    ↓
+LocalStorage 快取 (30 分鐘)
+    ↓
+資料處理 & 計算
+    ↓
+Chart.js 視覺化
+    ↓
+使用者互動 (縮放/篩選/匯出)
+```
+
+---
+
+## 📁 專案結構
 
 ```
 GLP1-weight-tracking/
-├─ BodyComposition_202507-202510.csv  # 體脂計匯出的 CSV 檔案（自動讀取）
-├─ GLP1_weight_tracking_master.xlsx   # （可選）手動維護的 Excel 主檔
-├─ generate_weekly_report.py          # 週報產生器（支援 CSV/Excel、中文顯示）
-├─ weekly/                            # 產生的「該週 Excel」
-└─ reports/                           # 產生的「週報 Markdown + 圖表」
-    ├─ 2025-CW01/                     # 每週報告資料夾
-    ├─ 2025-CW02/
-    └─ summary/                       # 總結報告資料夾
+│
+├── index.html          # 主應用程式（2855 行）
+├── CHANGELOG.md        # 更新日誌
+├── README.md           # 專案說明（本檔案）
+└── LICENSE             # MIT 授權
 ```
 
 ---
 
-## 💻 環境需求
+## 🎨 設計系統
 
-- Python 3.8+
-- 套件：`pandas`、`openpyxl`、`matplotlib`
-- （Linux 推薦）中文字型：`fonts-noto-cjk`
+### 顏色配置
 
-### 安裝
-```bash
-python3 -m pip install --upgrade pip
-python3 -m pip install pandas matplotlib openpyxl
-# 中文字型（Ubuntu/Debian）
-sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
-# 第一次安裝字型後，建議清除 matplotlib 快取
-rm -rf ~/.cache/matplotlib
-```
+| 用途 | 顏色代碼 | Tailwind 類別 |
+|------|----------|--------------|
+| **主色（藍色）** | `#2563EB` | `blue-600` |
+| **次色（青色）** | `#0891B2` | `cyan-600` |
+| **強調色（綠色）** | `#059669` | `emerald-600` |
+| **警示色（紅色）** | `#DC2626` | `red-600` |
+| **背景色** | `#F8FAFC` | `slate-50` |
+| **卡片背景** | `#FFFFFF` | `white` |
+| **文字色** | `#1E293B` | `slate-800` |
 
----
+### 醫療風格元素
 
-## 🗂️ 數據源格式
-
-### 方式 1：使用 CSV 檔案（推薦）
-
-直接從體脂計（如 OMRON HBF-222T）匯出 CSV 檔案，腳本會自動：
-- 解析測量日期時間
-- 將一天中的多次測量分類為「早上」（5:00-11:59）和「晚上」（12:00-隔天 4:59）
-- 若同一時段有多次測量，會自動計算平均值
- - 凌晨 0:00–4:59 視為前一天的晚上（PM）
- - 自動計算衍生欄位：脂肪重量(kg)、骨骼肌重量(kg)
-
-CSV 檔案需包含以下欄位：
-- `測量日期`（格式：`YYYY/MM/DD HH:MM`）
-- `體重(kg)`
-- `體脂肪(%)`
-
-### 方式 2：使用 Excel 檔案
-
-在 Excel 檔案的 **Daily Log** 工作表中，手動維護以下欄位：
-- `日期`
-- `早上體重 (kg)`、`晚上體重 (kg)`
-- `早上體脂 (%)`、`晚上體脂 (%)`
-- （可選）`藥物劑量 (mg)`、`副作用紀錄`、`每日飲水量 (L)`
-
-> 腳本內建常見別名對應（如 *AM weight / PM weight / 早上體重 / 晚上體重* 等）。
+- 📊 **圓角卡片** - `rounded-lg` 柔和邊角
+- 🎯 **線條圖示** - Font Awesome Regular (far)
+- 💫 **淡入動畫** - `fade-in` 簡約過場
+- 🏥 **InBody 視覺化** - 專業人體成分圖
+- 📐 **網格佈局** - 整齊的資料排列
 
 ---
 
-## ▶️ 使用方式
+## 📱 螢幕截圖
 
-### 1) 使用 CSV 檔案（預設）- 產生最新一週報告
-```bash
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv
-```
+### 桌面版
+![Desktop View](https://via.placeholder.com/800x400?text=Desktop+View)
 
-### 2) 產生總結報告（從第一天到最新數據）
-```bash
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --summary
-```
+### 手機版
+![Mobile View](https://via.placeholder.com/400x800?text=Mobile+View)
 
-### 3) 指定第 N 週（從 anchor 起算；1 = 2025-08-15～2025-08-21）
-```bash
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --week-index 1
-```
-
-### 4) 使用 Excel 檔案
-```bash
-python3 generate_weekly_report.py GLP1_weight_tracking_master.xlsx --sheet "Daily Log" --header-row 1
-```
-
-### 5) 自訂 anchor 日期和輸出目錄
-```bash
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --anchor-date 2025-08-15 --out-root .
-```
-
-### 6) 產生月報（最新或指定月份）
-```bash
-# 產生最新月份月報
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --monthly
-
-# 產生指定月份（YYYY-MM）
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --monthly 2025-09
-```
-
-### 7) 長期目標與 ETA（預估達標日期）
-```bash
-# 於週報 / 月報 / 總結加入「體重 79kg、體脂 12%」的長期目標
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --summary \
-  --goal-weight 79 --goal-fat-pct 12
-
-# 指定 ETA 算法（預設：--eta-scope global, --eta-metric fatkg, --eta-method endpoint_all）
-# 例如改回「近 28 天回歸」（regress28）
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --summary \
-  --goal-weight 79 --goal-fat-pct 12 --eta-method regress28
-```
+### 深色模式
+![Dark Mode](https://via.placeholder.com/800x400?text=Dark+Mode)
 
 ---
 
-## ⚙️ 參數說明
+## 🔐 隱私與安全
 
-| 參數 | 說明 | 範例 |
-|---|---|---|
-| `master` | 數據源檔案路徑（CSV 或 Excel） | `BodyComposition_202507-202510.csv` |
-| `--sheet` | Excel 工作表名稱（僅用於 Excel） | `"Daily Log"` |
-| `--header-row` | 標題列索引（僅用於 Excel，0=第一列） | `1` |
-| `--anchor-date` | 每週起始的對齊基準日（**週四**），第一週從這天開始 | `2025-08-15` |
-| `--week-index` | 第幾週（1-based；不給則抓最後一週） | `2` |
-| `--out-root` | 輸出根目錄 | `.` |
-| `--summary` | 產生總結報告（從第一天到最新數據） | （flag 參數，無需值） |
-| `--monthly [YYYY-MM]` | 產生月報；不帶值則輸出最新月份 | `--monthly 2025-09` |
-| `--goal-weight` | 長期目標體重 (kg) | `79` |
-| `--goal-fat-pct` | 長期目標體脂率 (%) | `12` |
-| `--eta-scope` | ETA 視窗：`global` 使用全資料最後日回推；`local` 僅用目前報告區間 | `global` |
-| `--eta-metric` | ETA 指標：`fatkg`（脂肪重量, 預設）/ `weight` / `fatpct` | `fatkg` |
-| `--eta-method` | ETA 方法：`regress28`（近28天回歸, 預設）/ `endpoint_all`（首末端點, 全期間）/ `regress_all`（全期間回歸）/ `endpoint28`（近28天端點） | `endpoint_all` |
-| `--inj-weekday` | GLP‑1 施打日（0=Mon … 6=Sun；預設週五=4） | `4` |
-| `--window-days` | 代謝分析與組成品質主要觀察窗天數 | `28` |
-| `--start-date` | 分析起始日（裁剪資料的起點，影響 summary/代謝分析） | `2025-08-15` |
-| `--mf-mode` | 代謝靈活度（MF）計分模式：`continuous`（連續分數，預設）/ `threshold`（達標記分） | `continuous` |
-| `--show-glp1` | 顯示 GLP‑1 週期偏移說明（預設不顯示） | （flag） |
-| `--show-target-lines` | 在圖表上繪製目標參考線（預設不顯示） | （flag） |
-| `--no-target-lines` | 不繪製目標參考線（預設） | （flag） |
+- ✅ **本地儲存** - 所有設定儲存在瀏覽器 LocalStorage
+- ✅ **唯讀資料** - 僅讀取 Google Sheets，不寫入
+- ✅ **無伺服器** - 完全前端運作，無後端追蹤
+- ✅ **離線優先** - 資料快取在本地，減少網路請求
+- ✅ **開源透明** - 完整程式碼可檢視與審核
 
 ---
 
-## 📤 產出說明
+## 📈 未來計畫
 
-- `weekly/<YYYY-CWNN>_weight_tracking.xlsx`：該週 Excel 快照（只含那週資料）。  
-- `reports/<YYYY-CWNN>/<YYYY-CWNN>_weekly_report.md`：Markdown 週報（內含資料表、統計、建議及圖表引用）。  
-- `reports/<YYYY-CWNN>/<YYYY-CWNN>_weight_trend.png`、`reports/<YYYY-CWNN>/<YYYY-CWNN>_bodyfat_trend.png`：該週趨勢圖。  
-- `reports/<YYYY-CWNN>/<YYYY-CWNN>_visceral_fat_trend.png`、`reports/<YYYY-CWNN>/<YYYY-CWNN>_muscle_trend.png`：內臟脂肪與骨骼肌趨勢圖。  
-- `reports/monthly/<YYYY-MM>/<YYYY-MM>_monthly_report.md`：月報（含 KPI、分析與目標/ETA）。  
-- `reports/summary/overall_summary_report.md`：總結報告（使用 `--summary` 參數時產生）。
-- `reports/summary/summary_weight_trend.png`、`reports/summary/summary_bodyfat_trend.png`、`reports/summary/summary_visceral_fat_trend.png`、`reports/summary/summary_muscle_trend.png`：總體趨勢圖。
+### v2.1 計畫功能
 
-> 週碼 `YYYY-CWNN` 的年份取該週 **起始日** 年份；`NN` = `week-index`。
+- [ ] 多語言支援（英文、簡中）
+- [ ] 匯入/匯出完整設定
+- [ ] 自訂圖表顏色
+- [ ] 更多統計指標（BMR、TDEE）
+- [ ] 資料比較模式（月對月、年對年）
 
----
+### v3.0 願景
 
-## 🧩 常見問題（FAQ）
-
-### 1) `ModuleNotFoundError: No module named 'pandas'`
-請先安裝依賴：
-```bash
-python3 -m pip install pandas matplotlib openpyxl
-```
-
-### 2) 開啟圖表時中文顯示亂碼
-安裝中文字型並清快取：
-```bash
-sudo apt-get install -y fonts-noto-cjk
-rm -rf ~/.cache/matplotlib
-```
-
-### 3) CSV 檔案中的測量時間如何分類？
-- **早上**：5:00 AM - 12:00 PM
-- **晚上**：12:00 PM - 4:59 AM（隔天）
-- 若同一時段有多次測量，會自動計算平均值
- - 凌晨 0:00–4:59 視為前一天的晚上（PM）
-
-### 4) `⚠️ 無法從 Excel 映射必要欄位`（僅 Excel 格式）
-代表程式抓錯標題列或工作表：
-- 確認標題列是第幾列（通常是第 2 列 → `--header-row 1`）  
-- 指定工作表名稱：`--sheet "Daily Log"`  
-- 若欄位名稱不同，程式會嘗試別名對應；若仍失敗，請回報錯誤訊息中「偵測到的欄位」。
-
-### 5) 如何產生所有週的報告？
-使用迴圈產生所有週的報告：
-```bash
-for i in {1..9}; do
-  python3 generate_weekly_report.py BodyComposition_202507-202510.csv --week-index $i
-done
-```
-
-### 6) 如何讓週/月/總結的 ETA 一致？
-預設（`--eta-method endpoint_all`）為「第一筆到最新一筆」端點法。若希望改回「近 28 天線性回歸」，請加上 `--eta-method regress28`：
-```bash
-# 週報（第 1～9 週），示範改回 regress28
-for i in {1..9}; do
-  python3 generate_weekly_report.py BodyComposition_202507-202510.csv --week-index $i \
-    --eta-method regress28
-done
-
-# 月報（最新與指定月份）
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --monthly --eta-method regress28
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --monthly 2025-08 --eta-method regress28
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --monthly 2025-09 --eta-method regress28
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --monthly 2025-10 --eta-method regress28
-
-# 總結
-python3 generate_weekly_report.py BodyComposition_202507-202510.csv --summary --eta-method regress28
-```
+- [ ] 雲端資料同步（Firebase / Supabase）
+- [ ] 多使用者支援
+- [ ] 社群分享功能
+- [ ] AI 趨勢預測
+- [ ] 營養建議整合
+- [ ] 運動記錄追蹤
 
 ---
 
-## 📝 小提示
-- **CSV 格式**：直接從體脂計匯出，腳本會自動分類早上/晚上測量值。
-- **Excel 格式**：需要手動維護早上/晚上的數據。
-- 使用 `--summary` 參數可以產生總結報告，查看整體減重進度。
- - 目標/ETA：預設長期目標為「體重 79kg、體脂 12%」，ETA 預設為 endpoint_all；可用 `--goal-weight`、`--goal-fat-pct` 與 `--eta-*` 覆寫。
-- 如果想把 anchor 改成其他日期（例如療程第二階段），只要改 `--anchor-date` 即可。
-- 建議定期備份 CSV 檔案，避免數據遺失。
- - 圖表包含「7 日移動平均」。目標線預設關閉，需顯示可加入 `--show-target-lines`。
- - GLP‑1 相關輸出預設隱藏；若需顯示，請加上 `--show-glp1`。同時，當 GLP‑1 隱藏時，MF 子分項會自動省略 F5（GLP‑1 週期品質）。
+## 🤝 貢獻指南
+
+歡迎提交 Issue 和 Pull Request！
+
+### 開發流程
+
+1. Fork 本專案
+2. 建立功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交變更 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 開啟 Pull Request
+
+### 程式碼風格
+
+- 使用 Tailwind CSS 類別
+- 遵循 ES6+ JavaScript 標準
+- 保持程式碼簡潔易讀
+- 添加必要的註解
 
 ---
 
 ## 📄 授權
-（可自行選擇 License；若未指定，建議 MIT）
+
+本專案採用 MIT 授權 - 詳見 [LICENSE](LICENSE) 檔案
+
+---
+
+## 👨‍💻 作者
+
+**Rex Huang**
+
+- GitHub: [@RexhuangTW](https://github.com/RexhuangTW)
+- Email: your.email@example.com
+
+---
+
+## 🙏 致謝
+
+- [Chart.js](https://www.chartjs.org/) - 強大的圖表庫
+- [Tailwind CSS](https://tailwindcss.com/) - 實用的 CSS 框架
+- [Font Awesome](https://fontawesome.com/) - 豐富的圖示集
+- [PapaParse](https://www.papaparse.com/) - 快速的 CSV 解析器
+- [jsPDF](https://github.com/parallax/jsPDF) - 客戶端 PDF 生成
+
+---
+
+## 📞 聯絡資訊
+
+如有任何問題或建議，歡迎透過以下方式聯絡：
+
+- 📧 Email: your.email@example.com
+- 💬 GitHub Issues: [提交 Issue](https://github.com/RexhuangTW/GLP1-weight-tracking/issues)
+- 🐛 Bug Report: [回報錯誤](https://github.com/RexhuangTW/GLP1-weight-tracking/issues/new?template=bug_report.md)
+- 💡 Feature Request: [建議功能](https://github.com/RexhuangTW/GLP1-weight-tracking/issues/new?template=feature_request.md)
+
+---
+
+<div align="center">
+
+**⭐️ 如果這個專案對你有幫助，請給個星星支持！ ⭐️**
+
+Made with ❤️ by Rex Huang
+
+</div>
