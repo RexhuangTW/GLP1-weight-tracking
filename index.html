@@ -461,7 +461,7 @@
                 <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-5">
                     <div>
                         <h3 class="font-display font-semibold text-xl">體重趨勢</h3>
-                        <p class="text-xs text-mute mt-1">實測（早／晚）與 7 日均線 · 滾輪縮放、拖曳平移</p>
+                        <p class="text-xs text-mute mt-1">早上實測與 7 日均線（所有統計以早上為準，晚上僅供參考）· 滾輪縮放、拖曳平移</p>
                     </div>
                     <span class="font-mono text-[11px] text-ink2 border border-line rounded-md px-3 py-1.5">目標 <span id="chart-goal-val" class="text-brandink font-semibold">–</span> kg</span>
                 </div>
@@ -537,18 +537,23 @@
                 <!-- 體組成變化 -->
                 <div class="sheet p-6 md:p-7">
                     <h3 class="font-display font-semibold text-xl mb-1">體組成變化</h3>
-                    <p class="text-xs text-mute mb-5">起始至今 · 依體重 × 體脂率估算</p>
+                    <p class="text-xs text-mute mb-5">起始至今 · 依早晨測量的體脂率／骨骼肌率估算（7 日平滑）</p>
                     <div class="ledger-row py-3.5 flex justify-between items-baseline">
                         <span class="text-xs text-ink2">脂肪量</span>
                         <span class="text-right text-sm" id="ana-fatmass"><span class="text-mute">–</span></span>
                     </div>
                     <div class="ledger-row py-3.5 flex justify-between items-baseline">
-                        <span class="text-xs text-ink2">除脂體重</span>
-                        <span class="text-right text-sm" id="ana-leanmass"><span class="text-mute">–</span></span>
+                        <span class="text-xs text-ink2">骨骼肌量</span>
+                        <span class="text-right text-sm" id="ana-musclemass"><span class="text-mute">–</span></span>
+                    </div>
+                    <div class="ledger-row py-3.5 flex justify-between items-baseline">
+                        <span class="text-xs text-ink2">水分・肝醣等<span class="text-mute">（推算）</span></span>
+                        <span class="text-right text-sm" id="ana-watermass"><span class="text-mute">–</span></span>
                     </div>
                     <div class="mt-5 sheet-inset p-4">
-                        <p class="text-xs leading-relaxed text-ink2" id="ana-comp-verdict">資料累積中，需要起始與最新的體脂率紀錄。</p>
+                        <p class="text-xs leading-relaxed text-ink2" id="ana-comp-verdict">資料累積中，需要起始與最新的體脂率／骨骼肌率紀錄。</p>
                     </div>
+                    <p class="text-[11px] text-mute mt-3 leading-relaxed">※ 除脂體重＝肌肉＋水分＋肝醣等，並非全是肌肉；骨骼肌量為 BIA 估計值，趨勢比單日數字可靠。</p>
                 </div>
             </div>
         </section>
@@ -787,7 +792,7 @@
                     <label class="block text-sm font-medium text-ink2 mb-2" for="input-entry-visceral">內臟脂肪等級</label>
                     <input type="number" step="0.5" min="1" max="30" id="input-entry-visceral" class="w-full px-4 py-3 bg-card2 border border-line rounded-lg outline-none focus:border-brandink text-ink" placeholder="8">
                 </div>
-                <p class="sheet-inset text-xs text-ink2 p-4">※ 手動紀錄僅儲存在此瀏覽器（localStorage），不會回寫 Google Sheets。</p>
+                <p class="sheet-inset text-xs text-ink2 p-4">※ 手動紀錄僅儲存在此瀏覽器（localStorage），不會回寫 Google Sheets。所有統計以「早上體重」為準，晚上數值僅供圖表參考。</p>
             </div>
             <div class="p-6 border-t border-line flex justify-end gap-3">
                 <button onclick="closeModal('data-entry-modal')" class="px-5 py-2.5 text-sm text-ink2 border border-line rounded-lg hover:bg-card2 transition">取消</button>
@@ -839,7 +844,15 @@
         const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
         const setText = (id, text) => { const el = $(id); if (el) el.innerText = text; };
         const hasVal = (v) => v !== null && v !== undefined && !isNaN(v);
-        const anyWeight = (d) => hasVal(d.w_am) ? d.w_am : (hasVal(d.w_pm) ? d.w_pm : null);
+        // 統計與推論一律以「早上體重」為準；晚上數據僅在圖表中供參考顯示
+        const anyWeight = (d) => hasVal(d.w_am) ? d.w_am : null;
+        const firstWeighted = () => STATE.allData.find(d => hasVal(d.w_am)) || null;
+        const lastWeighted = () => {
+            for (let i = STATE.allData.length - 1; i >= 0; i--) {
+                if (hasVal(STATE.allData[i].w_am)) return STATE.allData[i];
+            }
+            return null;
+        };
 
         // 一律使用本地時區的 YYYY-MM-DD，避免 toISOString 造成日期偏移
         function fmtLocalDate(d) {
@@ -1179,14 +1192,13 @@
                     if (valid.length === 0) return null;
                     return valid.reduce((a, b) => a + b[key], 0) / valid.length;
                 };
-                const vAvg = avg(d.AM, 'v');
                 return {
                     date,
                     w_am: avg(d.AM, 'w'),
                     w_pm: avg(d.PM, 'w'),
                     f_am: avg(d.AM, 'f'),
                     m_am: avg(d.AM, 'm'),
-                    v: vAvg !== null ? vAvg : avg(d.PM, 'v')
+                    v: avg(d.AM, 'v')   // 內臟脂肪同樣只取早上，維持全站「早上為準」
                 };
             });
         }
@@ -1275,8 +1287,8 @@
         // ================================================
         function renderKPIs() {
             if (STATE.allData.length === 0) return;
-            const latest = STATE.allData[STATE.allData.length - 1];
-            const first = STATE.allData[0];
+            const latest = lastWeighted() || STATE.allData[STATE.allData.length - 1];
+            const first = firstWeighted() || STATE.allData[0];
             const w = anyWeight(latest);
             const firstW = anyWeight(first);
 
@@ -1338,8 +1350,11 @@
 
         function calculateProgress() {
             if (STATE.allData.length === 0) return;
-            const start = anyWeight(STATE.allData[0]);
-            const current = anyWeight(STATE.allData[STATE.allData.length - 1]);
+            const firstRec = firstWeighted();
+            const lastRec = lastWeighted();
+            if (!firstRec || !lastRec) return;
+            const start = anyWeight(firstRec);
+            const current = anyWeight(lastRec);
             const goal = STATE.userSettings.goal;
             if (!hasVal(start) || !hasVal(current) || !hasVal(goal)) return;
 
@@ -1363,8 +1378,9 @@
 
         function updateQuickStats() {
             if (STATE.allData.length < 2) return;
-            const latest = STATE.allData[STATE.allData.length - 1];
-            const first = STATE.allData[0];
+            const latest = lastWeighted();
+            const first = firstWeighted();
+            if (!latest || !first || latest === first) return;
             const latestW = anyWeight(latest);
             const firstW = anyWeight(first);
             if (!hasVal(latestW) || !hasVal(firstW)) return;
@@ -1542,34 +1558,48 @@
             STATE.forecast = { dates: fDates, values: fVals, anchorY: yNow };
         }
 
-        // 體組成變化：脂肪量 vs 除脂體重（起始 → 現在）
+        // 體組成變化：脂肪量／骨骼肌量／水分及其他（起始 → 現在，7 日平滑）
+        // 明確分開「骨骼肌」與「水分等其他除脂成分」，避免把除脂體重誤讀為肌肉流失
         function renderCompositionAnalysis() {
-            const both = STATE.allData.filter(d => anyWeight(d) !== null && hasVal(d.f_am));
-            if (both.length < 2) return; // 保留「資料累積中」預設文案
-            const first = both[0], last = both[both.length - 1];
-            const w0 = anyWeight(first), w1 = anyWeight(last);
-            const fat0 = w0 * first.f_am / 100, fat1 = w1 * last.f_am / 100;
-            const lean0 = w0 - fat0, lean1 = w1 - fat1;
-            const dFat = fat1 - fat0, dLean = lean1 - lean0;
+            const usable = STATE.allData.filter(d =>
+                hasVal(d.w_am) && hasVal(d.f_am) && hasVal(d.m_am));
+            if (usable.length < 2) return; // 保留「資料累積中」預設文案
+
+            // 頭尾各取最多 7 筆平滑，避免單日 BIA 誤差
+            const mean = (arr, fn) => arr.reduce((s, d) => s + fn(d), 0) / arr.length;
+            const head = usable.slice(0, Math.min(7, usable.length));
+            const tail = usable.slice(-Math.min(7, usable.length));
+            const w0 = mean(head, d => d.w_am),                 w1 = mean(tail, d => d.w_am);
+            const fat0 = mean(head, d => d.w_am * d.f_am / 100), fat1 = mean(tail, d => d.w_am * d.f_am / 100);
+            const mus0 = mean(head, d => d.w_am * d.m_am / 100), mus1 = mean(tail, d => d.w_am * d.m_am / 100);
+
+            const totalLoss = w0 - w1;
+            const fatLoss = fat0 - fat1;
+            const musLoss = mus0 - mus1;
+            const waterLoss = totalLoss - fatLoss - musLoss; // 水分、肝醣與其他除脂成分
 
             const delta = (d, goodWhenDown) => {
                 const good = goodWhenDown ? d <= 0 : d >= 0;
                 return `<span class="font-mono font-semibold ml-2" style="color:${good ? 'var(--good)' : 'var(--bad)'}">${d <= 0 ? '▼' : '▲'} ${Math.abs(d).toFixed(1)}</span>`;
             };
             const fatEl = $('ana-fatmass');
-            const leanEl = $('ana-leanmass');
-            if (fatEl) fatEl.innerHTML = `<span class="font-mono text-xs text-mute">${fat0.toFixed(1)} →</span> <span class="num text-base font-semibold text-ink ml-1">${fat1.toFixed(1)} kg</span>${delta(dFat, true)}`;
-            if (leanEl) leanEl.innerHTML = `<span class="font-mono text-xs text-mute">${lean0.toFixed(1)} →</span> <span class="num text-base font-semibold text-ink ml-1">${lean1.toFixed(1)} kg</span>${delta(dLean, false)}`;
+            const musEl = $('ana-musclemass');
+            const watEl = $('ana-watermass');
+            if (fatEl) fatEl.innerHTML = `<span class="font-mono text-xs text-mute">${fat0.toFixed(1)} →</span> <span class="num text-base font-semibold text-ink ml-1">${fat1.toFixed(1)} kg</span>${delta(fat1 - fat0, true)}`;
+            if (musEl) musEl.innerHTML = `<span class="font-mono text-xs text-mute">${mus0.toFixed(1)} →</span> <span class="num text-base font-semibold text-ink ml-1">${mus1.toFixed(1)} kg</span>${delta(mus1 - mus0, false)}`;
+            if (watEl) watEl.innerHTML = `<span class="num text-base font-semibold text-ink">${waterLoss >= 0 ? '−' : '+'}${Math.abs(waterLoss).toFixed(1)} kg</span>`;
 
             const verdictEl = $('ana-comp-verdict');
             if (!verdictEl) return;
-            const totalLoss = w0 - w1;
             if (totalLoss > 0.5) {
-                const fatShare = Math.max(0, Math.min(150, Math.round((-dFat / totalLoss) * 100)));
-                if (dLean < 0 && -dLean > totalLoss * 0.3) {
-                    verdictEl.innerHTML = `累計減重 ${totalLoss.toFixed(1)} kg，其中約 <b>${fatShare}%</b> 來自脂肪。除脂體重流失偏多（${Math.abs(dLean).toFixed(1)} kg），建議提高蛋白質攝取並加入阻力訓練。`;
+                const pct = (x) => Math.max(0, Math.min(150, Math.round(x / totalLoss * 100)));
+                const breakdown = `累計減重 ${totalLoss.toFixed(1)} kg：脂肪 ${fatLoss.toFixed(1)} kg（${pct(fatLoss)}%）、骨骼肌 ${musLoss.toFixed(1)} kg（${pct(musLoss)}%）、水分及其他 ${waterLoss.toFixed(1)} kg（${pct(waterLoss)}%）。`;
+                if (musLoss > totalLoss * 0.3) {
+                    verdictEl.innerHTML = `${breakdown}肌肉流失比例偏高，建議提高蛋白質攝取（1.2–1.6 g/kg）並加入阻力訓練。`;
+                } else if (musLoss > totalLoss * 0.2) {
+                    verdictEl.innerHTML = `${breakdown}肌肉流失在可接受範圍邊緣，維持蛋白質攝取與阻力訓練可再改善。`;
                 } else {
-                    verdictEl.innerHTML = `累計減重 ${totalLoss.toFixed(1)} kg，其中約 <b>${fatShare}%</b> 來自脂肪，肌肉保留情況良好，減重品質理想。`;
+                    verdictEl.innerHTML = `${breakdown}肌肉保留情況良好，減重品質理想。`;
                 }
             } else {
                 verdictEl.innerText = '體重變化尚小，體組成分析將隨數據累積更加準確。';
@@ -1595,8 +1625,8 @@
                 '今天的選擇，決定明天的自己。'
             ];
             let pick;
-            const latest = STATE.allData[STATE.allData.length - 1];
-            const first = STATE.allData[0];
+            const latest = lastWeighted();
+            const first = firstWeighted();
             const latestW = latest ? anyWeight(latest) : null;
             const firstW = first ? anyWeight(first) : null;
             const denom = hasVal(firstW) ? firstW - STATE.userSettings.goal : 0;
@@ -1618,7 +1648,7 @@
         // 10. 體態報告
         // ================================================
         function updateBMIVisualization() {
-            const latest = STATE.allData[STATE.allData.length - 1];
+            const latest = lastWeighted();
             if (!latest) return;
             const w = anyWeight(latest);
             if (!hasVal(w)) return;
@@ -1653,7 +1683,8 @@
             setText('body-visceral', hasVal(data.v) ? data.v.toFixed(1) : '–');
 
             if (STATE.allData.length > 0) {
-                const start = anyWeight(STATE.allData[0]);
+                const firstRec = firstWeighted();
+                const start = firstRec ? anyWeight(firstRec) : null;
                 const goal = STATE.userSettings.goal;
                 if (hasVal(start) && hasVal(w) && start - goal > 0) {
                     const progress = Math.min(100, Math.max(0, ((start - w) / (start - goal)) * 100));
@@ -1697,11 +1728,11 @@
             const container = $('achievements');
             if (!container || STATE.allData.length === 0) return;
 
-            const latest = STATE.allData[STATE.allData.length - 1];
-            const first = STATE.allData[0];
+            const latest = lastWeighted();
+            const first = firstWeighted();
             const days = STATE.allData.length;
-            const latestW = anyWeight(latest);
-            const firstW = anyWeight(first);
+            const latestW = latest ? anyWeight(latest) : null;
+            const firstW = first ? anyWeight(first) : null;
             const totalLoss = (hasVal(latestW) && hasVal(firstW)) ? firstW - latestW : null;
 
             const badges = [
@@ -1755,7 +1786,12 @@
                 return;
             }
 
-            const endDate = data[data.length - 1].date;
+            const lastRec = lastWeighted();
+            if (!lastRec) {
+                container.innerHTML = '<p class="text-sm text-mute">暫無早上測量數據</p>';
+                return;
+            }
+            const endDate = lastRec.date;
             const weekAgo = shiftDateStr(endDate, -7);
             const twoWeeksAgo = shiftDateStr(endDate, -14);
             const thisWeek = data.filter(d => d.date > weekAgo);
@@ -2106,10 +2142,11 @@
             const tbody = $('data-table-body');
             if (!tbody) return;
 
-            // 預先建好「日期 → 前一筆」索引，供日變化欄使用
+            // 預先建好「日期 → 前一筆有早上體重的紀錄」索引，供日變化欄使用（統計以早上為準）
+            const amRecords = STATE.allData.filter(d => hasVal(d.w_am));
             const prevByDate = {};
-            for (let i = 1; i < STATE.allData.length; i++) {
-                prevByDate[STATE.allData[i].date] = STATE.allData[i - 1];
+            for (let i = 1; i < amRecords.length; i++) {
+                prevByDate[amRecords[i].date] = amRecords[i - 1];
             }
 
             const displayData = [...STATE.allData].sort((a, b) => {
