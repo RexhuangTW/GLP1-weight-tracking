@@ -491,6 +491,38 @@
         <!-- ── 03 · 分析與預測 ────────────────────────────── -->
         <section id="analysis-section" class="mb-12 rise" style="animation-delay:.16s">
             <p class="kicker mb-5">03 · 分析與預測</p>
+
+            <!-- 本期體組成階段判定（Body Recomposition 判定器）-->
+            <div id="card-phase" class="sheet p-6 md:p-7 mb-5">
+                <div class="flex flex-col md:flex-row md:items-center gap-5">
+                    <div class="md:w-64 shrink-0">
+                        <p class="font-mono text-[10px] tracking-[0.16em] uppercase text-mute mb-2">本期階段 · Current Phase</p>
+                        <div class="flex items-center gap-3">
+                            <span class="inline-block w-2.5 h-2.5 rounded-full" id="phase-dot" style="background:var(--mute)"></span>
+                            <span class="font-display font-semibold text-2xl md:text-[1.75rem] text-ink" id="phase-label">分析中</span>
+                        </div>
+                        <p class="text-xs text-mute mt-2" id="phase-window">依近期趨勢判定</p>
+                    </div>
+                    <div class="flex-1 md:border-l md:border-line md:pl-5">
+                        <p class="text-sm text-ink2 leading-relaxed" id="phase-desc">正在依脂肪量與骨骼肌量的趨勢判定目前的身體重組狀態……</p>
+                        <div class="mt-4 grid grid-cols-3 gap-4">
+                            <div>
+                                <p class="text-[11px] text-mute mb-1">脂肪趨勢</p>
+                                <p class="num text-base font-semibold" id="phase-fat-trend">–</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-mute mb-1">骨骼肌趨勢</p>
+                                <p class="num text-base font-semibold" id="phase-mus-trend">–</p>
+                            </div>
+                            <div>
+                                <p class="text-[11px] text-mute mb-1">減重品質<span class="text-mute">（脂肪佔比）</span></p>
+                                <p class="num text-base font-semibold" id="phase-quality">–</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="card-analysis" class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
                 <!-- 減重速率 -->
@@ -1442,12 +1474,105 @@
 
         const dayNum = (dateStr) => Math.round(new Date(dateStr + 'T00:00:00').getTime() / 86400000);
 
+        // ── 體組成階段判定（優化版 body-recomposition 分類器）──
+        // 相對舊版 classify_week_status 的改進：
+        //  1) 以整個視窗的「回歸斜率」判定趨勢，取代頭尾兩點相減（抗缺測日與單日 BIA 跳動）
+        //  2) 門檻對齊 BIA 實測噪音（骨骼肌 ±0.10、脂肪 ±0.12 kg/週）
+        //  3) 六類生理階段，含「肌肉流失警示」與「優質減脂」
+        //  4) 以樣本數與時間跨度做資料充足度把關
+        function classifyBodyPhase() {
+            const rows = STATE.allData.filter(d => hasVal(d.w_am) && hasVal(d.f_am) && hasVal(d.m_am));
+            if (rows.length < 6) return { key: 'insufficient', label: '資料不足', color: 'var(--mute)',
+                desc: '需要至少 6 筆同時含體重、體脂率、骨骼肌率的早晨紀錄才能判定體組成階段。' };
+
+            const lastDate = rows[rows.length - 1].date;
+            let win = rows.filter(d => d.date > shiftDateStr(lastDate, -28));
+            if (win.length < 6) win = rows.slice(-Math.min(10, rows.length));
+            const spanDays = dayNum(lastDate) - dayNum(win[0].date) + 1;
+            if (win.length < 6 || spanDays < 10) return { key: 'insufficient', label: '資料不足', color: 'var(--mute)',
+                desc: '近期紀錄過於稀疏，維持每日早晨量測即可解鎖體組成階段判定。' };
+
+            const fit = (getY) => linearRegression(win.map(d => ({ x: dayNum(d.date), y: getY(d) })));
+            const wReg = fit(d => d.w_am);
+            const fReg = fit(d => d.w_am * d.f_am / 100);   // 脂肪量 kg
+            const mReg = fit(d => d.w_am * d.m_am / 100);   // 骨骼肌量 kg
+            if (!wReg || !fReg || !mReg) return { key: 'insufficient', label: '資料不足', color: 'var(--mute)',
+                desc: '趨勢無法估計，請確認近期資料。' };
+
+            const wR = wReg.slope * 7, fR = fReg.slope * 7, mR = mReg.slope * 7; // kg/週
+            const NF = 0.12, NM = 0.10, NW = 0.10; // 噪音門檻（kg/週）
+
+            let res;
+            if (mR >= NM && fR <= -NF) {
+                // 肌肉上升 + 脂肪下降 = 教科書級身體重組
+                res = { key: 'recomp', label: '身體重組', color: 'var(--good)',
+                    desc: '脂肪下降的同時骨骼肌上升——這是最理想的「Body Recomposition」狀態，維持目前的蛋白質攝取與阻力訓練。' };
+            } else if (wR >= NW && fR >= NF * 0.6) {
+                res = { key: 'regain', label: '脂肪回升', color: 'var(--bad)',
+                    desc: '體重與脂肪量同步上升，建議回顧近期飲食（尤其液體熱量）與作息；若持續兩週以上請提高警覺。' };
+            } else if (wR <= -NW) {
+                // 明確減重中：評估品質
+                const fatShare = fR < 0 && wR < 0 ? Math.min(1.5, fR / wR) : 0;
+                const musLossShare = mR < 0 && wR < 0 ? mR / wR : 0;
+                if (mR <= -NM && musLossShare >= 0.35) {
+                    res = { key: 'catabolic', label: '肌肉流失警示', color: 'var(--warn)',
+                        desc: `減重中骨骼肌流失比例偏高（約佔減重的 ${Math.round(musLossShare * 100)}%）。請提高蛋白質至 1.2–1.6 g/kg，並確保每週 2–3 次阻力訓練。` };
+                } else if (fatShare >= 0.65) {
+                    res = { key: 'quality-cut', label: '優質減脂', color: 'var(--good)',
+                        desc: `體重下降且主要來自脂肪（約 ${Math.round(fatShare * 100)}%），肌肉保留良好，減重品質理想。` };
+                } else {
+                    res = { key: 'cut', label: '減脂期', color: 'var(--info)',
+                        desc: '體重穩定下降中，脂肪為主要來源；持續留意蛋白質攝取以保護肌肉。' };
+                }
+            } else if (Math.abs(wR) < NW && Math.abs(fR) < NF) {
+                res = { key: 'plateau', label: '平台期', color: 'var(--mute)',
+                    desc: '體重與脂肪量趨於平緩，屬常見的生理適應。可檢視飲食、睡眠與活動量；平台期不代表停止進步。' };
+            } else {
+                res = { key: 'transition', label: '體組成調整中', color: 'var(--info)',
+                    desc: '體重與體組成正在轉換，趨勢尚未明朗，維持記錄以取得更清晰的判定。' };
+            }
+            res.wR = wR; res.fR = fR; res.mR = mR; res.span = spanDays; res.n = win.length;
+            res.r2 = wReg.r2;
+            // 減重品質（脂肪佔比）：以視窗內回歸推算的脂肪變化 / 體重變化
+            res.quality = (wR < -0.02 && fR < 0) ? Math.min(1.2, fR / wR) : null;
+            return res;
+        }
+
+        function renderBodyPhase() {
+            const p = classifyBodyPhase();
+            const dot = $('phase-dot'), label = $('phase-label'), win = $('phase-window'), desc = $('phase-desc');
+            if (dot) dot.style.background = p.color;
+            if (label) { label.innerText = p.label; label.style.color = p.color; }
+            if (desc) desc.innerText = p.desc;
+            if (win) win.innerText = p.n ? `近 ${p.span} 天 · ${p.n} 筆 · 回歸判定` : '依近期趨勢判定';
+
+            const fmtRate = (r) => {
+                if (r === undefined || r === null) return '<span class="text-mute">–</span>';
+                const good = r < 0; // 對脂肪而言下降為佳；此處僅著色方向
+                return `<span style="color:${Math.abs(r) < 0.05 ? 'var(--mute)' : (good ? 'var(--good)' : 'var(--bad)')}">${r <= 0 ? '▼' : '▲'} ${Math.abs(r).toFixed(2)}<span class="text-[10px] text-mute font-normal"> kg/週</span></span>`;
+            };
+            const ft = $('phase-fat-trend'), mt = $('phase-mus-trend'), q = $('phase-quality');
+            if (ft) ft.innerHTML = fmtRate(p.fR);
+            // 肌肉：上升為佳，著色方向相反
+            if (mt) {
+                if (p.mR === undefined) mt.innerHTML = '<span class="text-mute">–</span>';
+                else {
+                    const color = Math.abs(p.mR) < 0.05 ? 'var(--mute)' : (p.mR > 0 ? 'var(--good)' : 'var(--bad)');
+                    mt.innerHTML = `<span style="color:${color}">${p.mR >= 0 ? '▲' : '▼'} ${Math.abs(p.mR).toFixed(2)}<span class="text-[10px] text-mute font-normal"> kg/週</span></span>`;
+                }
+            }
+            if (q) q.innerHTML = (p.quality !== null && p.quality !== undefined)
+                ? `${Math.round(Math.max(0, Math.min(1.2, p.quality)) * 100)}<span class="text-[10px] text-mute font-normal"> %</span>`
+                : '<span class="text-mute">–</span>';
+        }
+
         function updateAnalysis() {
             STATE.forecast = null;
             const series = STATE.allData
                 .map(d => ({ date: d.date, w: anyWeight(d) }))
                 .filter(p => p.w !== null);
             renderCompositionAnalysis();
+            renderBodyPhase();
             if (series.length < 7) return;
 
             // 回歸視窗：近 28 天；不足 7 筆則改用最後 14 筆
@@ -2301,7 +2426,7 @@
                 let y = margin;
                 const surface = cssVar('--card');
 
-                const sections = [banner, $('kpi-grid'), $('card-weight-chart'), $('small-charts'), $('card-analysis'), $('card-week'), $('card-table')];
+                const sections = [banner, $('kpi-grid'), $('card-weight-chart'), $('small-charts'), $('card-phase'), $('card-analysis'), $('card-week'), $('card-table')];
 
                 for (const el of sections) {
                     if (!el) continue;
