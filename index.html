@@ -136,16 +136,15 @@
         }
         .tnum { font-variant-numeric: tabular-nums; }
 
-        /* 區段標籤（帳本式 kicker） */
+        /* 區段標籤（安靜的章節編號） */
         .kicker {
             font-family: 'IBM Plex Mono', monospace;
-            font-size: 11px;
-            letter-spacing: 0.22em;
-            text-transform: uppercase;
+            font-size: 10px;
+            letter-spacing: 0.16em;
             color: var(--mute);
-            display: flex; align-items: center; gap: 12px;
+            display: flex; align-items: center; gap: 10px;
         }
-        .kicker::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+        .kicker::after { content: ''; flex: 1; border-top: 1px solid var(--line2); }
 
         /* 報告卡片 */
         .sheet {
@@ -206,12 +205,20 @@
         th.sort-asc::after  { content: ' ↑'; opacity: 1; color: var(--brand-ink); }
         th.sort-desc::after { content: ' ↓'; opacity: 1; color: var(--brand-ink); }
 
-        /* 日期範圍切換 */
-        .seg-btn { color: var(--ink2); }
+        /* 日期範圍切換（合併式分段控制） */
+        .seg-group {
+            display: inline-flex;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--card);
+            align-self: flex-start;
+        }
+        .seg-btn { color: var(--ink2); border-right: 1px solid var(--line); }
+        .seg-btn:last-child { border-right: 0; }
         .seg-btn.seg-active {
             background: var(--brand);
             color: var(--on-brand);
-            border-color: var(--brand);
         }
 
         /* BMI 量尺（線性刻度 15–35，色帶與指針同一座標系） */
@@ -247,7 +254,7 @@
     <div id="loading" class="fixed inset-0 bg-paper z-[60] flex flex-col items-center justify-center transition-opacity duration-500">
         <div class="w-14 h-14 rounded-full border-2 border-line border-t-brandink animate-spin mb-6"></div>
         <p class="font-display text-xl text-ink">資料整理中</p>
-        <p class="font-mono text-xs tracking-[0.2em] text-mute mt-2 uppercase">Syncing clinical data…</p>
+        <p class="font-mono text-xs tracking-[0.08em] text-mute mt-2">正在同步 Google Sheets 資料</p>
     </div>
 
     <!-- 載入失敗面板 -->
@@ -294,7 +301,7 @@
         </div>
 
         <nav class="flex-1 overflow-y-auto p-4">
-            <p class="kicker mb-3 px-2">索引 · Index</p>
+            <p class="kicker mb-3 px-2">索引</p>
             <a href="#dashboard" onclick="navTo(event,'dashboard')" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink2 hover:bg-card2 hover:text-ink transition">
                 <span class="font-mono text-xs text-mute w-6">01</span> 每日摘要
             </a>
@@ -308,7 +315,7 @@
                 <span class="font-mono text-xs text-mute w-6">04</span> 數據明細
             </a>
 
-            <p class="kicker mt-6 mb-3 px-2">操作 · Actions</p>
+            <p class="kicker mt-6 mb-3 px-2">操作</p>
             <button onclick="openModal('data-entry-modal')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink2 hover:bg-card2 hover:text-ink transition text-left">
                 <span class="font-mono text-xs text-mute w-6">＋</span> 新增紀錄
             </button>
@@ -317,15 +324,15 @@
             </button>
 
             <!-- 目標卡 -->
-            <div class="mt-7 bg-brand rounded-lg p-5 text-onbrand relative overflow-hidden">
-                <p class="font-mono text-[10px] tracking-[0.2em] uppercase opacity-75 mb-1.5">Target Weight</p>
-                <p class="num text-4xl font-semibold"><span id="sidebar-goal">–</span><span class="text-base font-normal opacity-70 ml-1.5">kg</span></p>
+            <div class="mt-7 rounded-lg p-5 border border-line bg-card2 relative overflow-hidden">
+                <p class="text-[11px] text-ink2 mb-1.5">目標體重</p>
+                <p class="num text-4xl font-semibold text-brandink"><span id="sidebar-goal">–</span><span class="text-base font-normal text-mute ml-1.5">kg</span></p>
                 <div class="mt-4 flex justify-between items-baseline text-xs mb-1.5">
-                    <span class="opacity-75">達成率</span>
-                    <span class="num text-lg font-semibold" id="sidebar-progress">–</span>
+                    <span class="text-mute">達成率</span>
+                    <span class="num text-base font-semibold text-ink" id="sidebar-progress">–</span>
                 </div>
-                <div class="w-full h-1.5 rounded-full bg-black/25">
-                    <div class="h-1.5 rounded-full bg-onbrand transition-all duration-1000" id="sidebar-progress-bar" style="width:0%"></div>
+                <div class="w-full h-1 rounded-full bg-line">
+                    <div class="h-1 rounded-full transition-all duration-1000" id="sidebar-progress-bar" style="width:0%;background:var(--brand)"></div>
                 </div>
             </div>
 
@@ -352,92 +359,97 @@
     <!-- 主內容 -->
     <main class="relative z-10 md:ml-72 px-4 md:px-10 pt-20 md:pt-10 pb-16 max-w-6xl">
 
-        <!-- ── 01 · 每日摘要 ─────────────────────────────── -->
+        <!-- ── 01 · 每日摘要（病歷文件式表頭）──────────────── -->
         <header id="dashboard" class="rise mb-8" style="animation-delay:.02s">
-            <p class="kicker mb-4">01 · 每日摘要 Daily Digest</p>
-            <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-5">
+            <p class="kicker mb-5">01 · 每日摘要</p>
+            <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-6 border-b-4 border-double border-line">
                 <div>
-                    <h2 class="font-display font-semibold text-3xl md:text-4xl tracking-tight">體重管理儀表板</h2>
-                    <p class="text-sm text-mute mt-2 font-mono" id="today-date"></p>
+                    <h2 class="font-display font-semibold text-3xl md:text-[2.5rem] tracking-tight leading-tight">體重管理儀表板</h2>
+                    <p class="mt-3 text-sm text-ink2">
+                        <span class="font-mono text-mute" id="today-date"></span>
+                        <span class="mx-2 text-line">｜</span>
+                        <span class="italic" id="daily-motivation">正在載入今日資料……</span>
+                    </p>
                 </div>
-                <div class="flex gap-1.5 flex-wrap" role="group" aria-label="日期範圍">
-                    <button data-range="1W"  onclick="filterDate('1W')"  class="seg-btn px-4 py-2 text-sm rounded-md border border-line transition">近 7 天</button>
-                    <button data-range="1M"  onclick="filterDate('1M')"  class="seg-btn px-4 py-2 text-sm rounded-md border border-line transition">近 30 天</button>
-                    <button data-range="3M"  onclick="filterDate('3M')"  class="seg-btn px-4 py-2 text-sm rounded-md border border-line transition">近 90 天</button>
-                    <button data-range="ALL" onclick="filterDate('ALL')" class="seg-btn px-4 py-2 text-sm rounded-md border border-line transition">全期間</button>
+                <div class="seg-group" role="group" aria-label="日期範圍">
+                    <button data-range="1W"  onclick="filterDate('1W')"  class="seg-btn px-4 py-2 text-sm transition">近 7 天</button>
+                    <button data-range="1M"  onclick="filterDate('1M')"  class="seg-btn px-4 py-2 text-sm transition">近 30 天</button>
+                    <button data-range="3M"  onclick="filterDate('3M')"  class="seg-btn px-4 py-2 text-sm transition">近 90 天</button>
+                    <button data-range="ALL" onclick="filterDate('ALL')" class="seg-btn px-4 py-2 text-sm transition">全期間</button>
                 </div>
             </div>
         </header>
 
-        <!-- 激勵語 + 快速統計 -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-10 rise" style="animation-delay:.06s">
-            <div class="lg:col-span-2 sheet p-7 relative overflow-hidden border-l-4" style="border-left-color:var(--brand)">
-                <div class="relative">
-                    <p class="font-mono text-[10px] tracking-[0.2em] uppercase text-mute mb-3">今日一句 · Daily Note</p>
-                    <p class="font-display font-medium text-xl md:text-2xl leading-relaxed text-ink" id="daily-motivation">正在載入今日資料……</p>
+        <!-- 生命徵象：主數值 + 檢驗報告表 -->
+        <div id="kpi-grid" class="sheet mb-10 rise overflow-hidden" style="animation-delay:.06s">
+            <div class="grid grid-cols-1 lg:grid-cols-5">
+                <!-- 主數值：目前體重 -->
+                <div class="lg:col-span-2 p-6 md:p-8 border-b lg:border-b-0 lg:border-r border-line">
+                    <p class="text-xs font-medium text-ink2 mb-2">目前體重</p>
+                    <p class="flex items-baseline gap-2">
+                        <span class="num text-6xl md:text-7xl font-semibold text-ink tracking-tight" id="kpi-weight">–</span>
+                        <span class="text-lg text-mute">kg</span>
+                    </p>
+                    <div id="kpi-weight-trend" class="text-sm mt-3 min-h-[1.25rem]"></div>
+                    <div class="grid grid-cols-3 gap-4 mt-7 pt-5 border-t border-dashed border-line">
+                        <div>
+                            <p class="text-[11px] text-mute mb-1">週平均變化</p>
+                            <p class="num text-base font-semibold text-brandink" id="weekly-avg">–</p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] text-mute mb-1">距離目標</p>
+                            <p class="num text-base font-semibold text-ink" id="goal-remaining">–</p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] text-mute mb-1">預計達標</p>
+                            <p class="num text-base font-semibold text-ink" id="estimated-days">–</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="sheet p-6">
-                <p class="font-mono text-[10px] tracking-[0.2em] uppercase text-mute mb-4">快速統計 · At a Glance</p>
-                <div class="ledger-row flex justify-between items-baseline py-2.5">
-                    <span class="text-xs text-ink2">週平均變化</span>
-                    <span class="num text-lg font-semibold text-brandink" id="weekly-avg">–</span>
+                <!-- 檢驗報告表：身體組成 -->
+                <div class="lg:col-span-3 p-6 md:p-8">
+                    <div class="flex items-baseline justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-ink">身體組成檢測</h3>
+                        <span class="text-[11px] text-mute">參考區間以成年男性為準</span>
+                    </div>
+                    <div class="grid grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 pb-2 border-b border-line font-mono text-[10px] tracking-wider uppercase text-mute">
+                        <span>項目</span>
+                        <span class="text-right">數值</span>
+                        <span class="text-right">參考區間</span>
+                        <span class="text-right">累計變化</span>
+                    </div>
+                    <div class="grid grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 items-baseline py-3.5 border-b border-dashed border-line">
+                        <span class="text-sm text-ink2">BMI <span id="kpi-bmi-badge" class="font-mono text-[10px] px-1.5 py-0.5 rounded border border-line text-mute ml-1">–</span></span>
+                        <span class="num text-xl font-semibold text-ink text-right" id="kpi-bmi-val">–</span>
+                        <span class="font-mono text-xs text-mute text-right">18.5–24.0</span>
+                        <span class="text-xs text-right text-mute">—</span>
+                    </div>
+                    <div class="grid grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 items-baseline py-3.5 border-b border-dashed border-line">
+                        <span class="text-sm text-ink2">體脂率</span>
+                        <span class="text-right"><span class="num text-xl font-semibold text-ink" id="kpi-fat">–</span><span class="text-xs text-mute ml-0.5">%</span></span>
+                        <span class="font-mono text-xs text-mute text-right">10–20 %</span>
+                        <div id="kpi-fat-trend" class="text-xs text-right"></div>
+                    </div>
+                    <div class="grid grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 items-baseline py-3.5 border-b border-dashed border-line">
+                        <span class="text-sm text-ink2">骨骼肌率</span>
+                        <span class="text-right"><span class="num text-xl font-semibold text-ink" id="kpi-muscle">–</span><span class="text-xs text-mute ml-0.5">%</span></span>
+                        <span class="font-mono text-xs text-mute text-right">&ge; 32 %</span>
+                        <div id="kpi-muscle-trend" class="text-xs text-right"></div>
+                    </div>
+                    <div class="grid grid-cols-[1.3fr_1fr_1fr_1fr] gap-2 items-baseline py-3.5">
+                        <span class="text-sm text-ink2">內臟脂肪</span>
+                        <span class="text-right"><span class="num text-xl font-semibold text-ink" id="kpi-visceral">–</span><span class="text-xs text-mute ml-0.5">Lv</span></span>
+                        <span class="font-mono text-xs text-mute text-right">&le; 9.0</span>
+                        <div id="kpi-visceral-trend" class="text-xs text-right"></div>
+                    </div>
                 </div>
-                <div class="ledger-row flex justify-between items-baseline py-2.5">
-                    <span class="text-xs text-ink2">距離目標</span>
-                    <span class="num text-lg font-semibold text-ink" id="goal-remaining">–</span>
-                </div>
-                <div class="ledger-row flex justify-between items-baseline py-2.5">
-                    <span class="text-xs text-ink2">預計達標</span>
-                    <span class="num text-lg font-semibold text-ink" id="estimated-days">–</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- KPI 五格 -->
-        <div id="kpi-grid" class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10 rise" style="animation-delay:.1s">
-            <div class="sheet p-5">
-                <p class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute mb-3 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full" style="background:var(--c1)"></span> 目前體重
-                </p>
-                <p class="num text-4xl font-semibold text-ink"><span id="kpi-weight">–</span><span class="text-base text-mute font-normal ml-1">kg</span></p>
-                <div id="kpi-weight-trend" class="text-xs mt-3 min-h-[1rem]"></div>
-            </div>
-            <div class="sheet p-5">
-                <p class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute mb-3">BMI 指數</p>
-                <div class="flex items-baseline gap-2">
-                    <p class="num text-4xl font-semibold text-ink" id="kpi-bmi-val">–</p>
-                    <span id="kpi-bmi-badge" class="font-mono text-[10px] px-2 py-0.5 rounded border border-line text-mute">–</span>
-                </div>
-                <p class="text-xs text-mute mt-3">標準 18.5 – 24.0</p>
-            </div>
-            <div class="sheet p-5">
-                <p class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute mb-3 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full" style="background:var(--c4)"></span> 體脂率
-                </p>
-                <p class="num text-4xl font-semibold text-ink"><span id="kpi-fat">–</span><span class="text-base text-mute font-normal ml-1">%</span></p>
-                <div id="kpi-fat-trend" class="text-xs mt-3 min-h-[1rem]"></div>
-            </div>
-            <div class="sheet p-5">
-                <p class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute mb-3 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full" style="background:var(--c5)"></span> 內臟脂肪
-                </p>
-                <p class="num text-4xl font-semibold text-ink" id="kpi-visceral">–</p>
-                <div id="kpi-visceral-trend" class="text-xs mt-3 min-h-[1rem]"></div>
-            </div>
-            <div class="sheet p-5">
-                <p class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute mb-3 flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full" style="background:var(--c3)"></span> 骨骼肌率
-                </p>
-                <p class="num text-4xl font-semibold text-ink"><span id="kpi-muscle">–</span><span class="text-base text-mute font-normal ml-1">%</span></p>
-                <div id="kpi-muscle-trend" class="text-xs mt-3 min-h-[1rem]"></div>
             </div>
         </div>
 
         <!-- ── 02 · 趨勢圖表 ─────────────────────────────── -->
         <section id="charts-section" class="mb-12 rise" style="animation-delay:.14s">
             <div class="flex items-end justify-between gap-4 mb-5">
-                <p class="kicker flex-1">02 · 趨勢圖表 Trends</p>
+                <p class="kicker flex-1">02 · 趨勢圖表</p>
                 <button onclick="resetAllCharts()" class="shrink-0 font-mono text-[11px] text-mute hover:text-brandink border border-line rounded-md px-3 py-1.5 transition">重置縮放</button>
             </div>
 
@@ -475,7 +487,7 @@
 
         <!-- ── 03 · 體態報告 ─────────────────────────────── -->
         <section id="report-section" class="mb-12 rise" style="animation-delay:.18s">
-            <p class="kicker mb-5">03 · 體態報告 Body Report</p>
+            <p class="kicker mb-5">03 · 體態報告</p>
 
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 mb-5">
                 <!-- 檢驗摘要 -->
@@ -483,13 +495,13 @@
                     <div class="flex items-start justify-between mb-6">
                         <div>
                             <h3 class="font-display font-semibold text-xl">本期檢驗摘要</h3>
-                            <p class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute mt-1.5">Latest Measurement</p>
+                            <p class="text-xs text-mute mt-1.5">依最近一次測量計算</p>
                         </div>
-                        <!-- 健康評分印章 -->
+                        <!-- 健康評分環 -->
                         <div class="text-center">
                             <div class="stamp w-20 h-20 flex flex-col items-center justify-center">
                                 <span class="num text-3xl font-semibold leading-none" id="health-score">–</span>
-                                <span class="font-mono text-[9px] tracking-widest mt-0.5">SCORE</span>
+                                <span class="text-[10px] text-mute mt-0.5">綜合評分</span>
                             </div>
                             <p class="text-[11px] text-mute mt-2" id="health-grade">計算中</p>
                         </div>
@@ -525,7 +537,7 @@
                     <!-- BMI 量尺 -->
                     <div class="mt-8">
                         <div class="flex items-baseline justify-between mb-3">
-                            <span class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute">BMI Scale 15 – 35</span>
+                            <span class="font-mono text-[10px] tracking-[0.16em] text-mute">BMI 量尺 15–35</span>
                             <span><span class="num text-3xl font-semibold" id="bmi-large">–</span>
                             <span class="text-xs ml-2" id="bmi-status">評估中</span></span>
                         </div>
@@ -548,27 +560,27 @@
                 <!-- 體重變化 + 成就 -->
                 <div class="lg:col-span-2 flex flex-col gap-5">
                     <div class="sheet p-6 bg-brand text-onbrand border-0">
-                        <p class="font-mono text-[10px] tracking-[0.2em] uppercase opacity-75 mb-4">體重變化 · Progress</p>
-                        <div class="flex items-center justify-between gap-3">
-                            <div class="flex-1 text-center rounded-lg bg-black/20 py-4">
-                                <p class="text-[11px] opacity-75 mb-1">起始</p>
-                                <p class="num text-2xl font-semibold" id="weight-start">–</p>
+                        <p class="text-[11px] opacity-80 mb-5">體重變化</p>
+                        <div class="flex items-baseline justify-center gap-5">
+                            <div class="text-center">
+                                <p class="text-[11px] opacity-70 mb-1">起始</p>
+                                <p class="num text-3xl font-semibold" id="weight-start">–</p>
                             </div>
-                            <span class="font-display text-2xl opacity-60">→</span>
-                            <div class="flex-1 text-center rounded-lg bg-black/20 py-4">
-                                <p class="text-[11px] opacity-75 mb-1">現在</p>
-                                <p class="num text-2xl font-semibold" id="weight-now">–</p>
+                            <span class="text-xl opacity-50">→</span>
+                            <div class="text-center">
+                                <p class="text-[11px] opacity-70 mb-1">現在</p>
+                                <p class="num text-3xl font-semibold" id="weight-now">–</p>
                             </div>
                         </div>
-                        <div class="mt-4 rounded-lg bg-card text-center py-4">
-                            <p class="font-mono text-[10px] tracking-[0.18em] uppercase text-mute mb-1">累計變化</p>
-                            <p class="num text-3xl font-semibold text-brandink" id="total-loss">–</p>
+                        <div class="mt-5 pt-4 border-t border-white/25 text-center">
+                            <p class="text-[11px] opacity-70 mb-1">累計變化</p>
+                            <p class="num text-4xl font-semibold" id="total-loss">–</p>
                         </div>
                     </div>
 
                     <div class="sheet p-6 flex-1">
-                        <p class="font-mono text-[10px] tracking-[0.2em] uppercase text-mute mb-4">達成成就 · Badges</p>
-                        <div class="grid grid-cols-3 gap-3" id="achievements"><!-- JS --></div>
+                        <p class="text-sm font-semibold text-ink mb-4">達成成就</p>
+                        <div class="flex flex-wrap gap-2" id="achievements"><!-- JS --></div>
                     </div>
                 </div>
             </div>
@@ -577,7 +589,7 @@
             <div id="card-week" class="sheet p-6 md:p-7 mb-5">
                 <h3 class="font-display font-semibold text-xl mb-1">週比較</h3>
                 <p class="text-xs text-mute mb-5">近 7 天 vs 前 7 天（平均值）</p>
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="week-comparison"><!-- JS --></div>
+                <div id="week-comparison"><!-- JS --></div>
             </div>
 
             <!-- 最佳紀錄 + 波動分析 -->
@@ -597,7 +609,7 @@
 
         <!-- ── 04 · 數據明細 ─────────────────────────────── -->
         <section id="table-section" class="mb-10 rise" style="animation-delay:.22s">
-            <p class="kicker mb-5">04 · 數據明細 Records</p>
+            <p class="kicker mb-5">04 · 數據明細</p>
             <div id="card-table" class="sheet overflow-hidden">
                 <div class="p-5 md:p-6 border-b border-line flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                     <h3 class="font-display font-semibold text-xl">測量紀錄</h3>
@@ -631,7 +643,7 @@
         </section>
 
         <footer class="text-center pt-4 pb-2">
-            <p class="font-mono text-[11px] text-mute tracking-wide">HealthTrack · 專業健康數據追蹤 · Chart.js × Tailwind</p>
+            <p class="font-mono text-[11px] text-mute tracking-wide">HealthTrack — GLP-1 體重追蹤 · 資料來源 Google Sheets</p>
         </footer>
     </main>
 
@@ -645,7 +657,7 @@
             <div class="p-6 space-y-5">
                 <div>
                     <label class="block text-sm font-medium text-ink2 mb-2" for="input-height">身高 (cm)</label>
-                    <input type="number" id="input-height" min="100" max="250" class="w-full px-4 py-3 bg-card2 border border-line rounded-lg outline-none focus:border-brandink text-ink" placeholder="例如 175">
+                    <input type="number" id="input-height" min="100" max="250" class="w-full px-4 py-3 bg-card2 border border-line rounded-lg outline-none focus:border-brandink text-ink" placeholder="例如 178">
                     <p class="text-xs text-mute mt-1.5">用於計算 BMI</p>
                 </div>
                 <div>
@@ -722,7 +734,7 @@
         // ================================================
         const CONFIG = {
             CSV_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTsEpxVh2vol3e0ZPsnEktRIuPCl_p4YaI0lcKv04UvulHojxCJTbQyPicY0LhMvw31HD7e4gxtE6AB/pub?output=csv',
-            DEFAULT_HEIGHT: 175,
+            DEFAULT_HEIGHT: 178,
             DEFAULT_GOAL: 79,
             DEFAULT_GOAL_FAT: 15,
             DEFAULT_GOAL_BMI: 22,
@@ -1199,7 +1211,7 @@
             const firstW = anyWeight(first);
 
             setKPI('kpi-weight', w, 1);
-            renderTrend('kpi-weight-trend', w, firstW, false);
+            renderTrend('kpi-weight-trend', w, firstW, false, '較起始 ');
 
             if (hasVal(w)) {
                 const h = STATE.userSettings.height / 100;
@@ -1232,7 +1244,7 @@
             setText(id, hasVal(val) ? val.toFixed(fix) : '–');
         }
 
-        function renderTrend(elId, curr, start, isHigherBetter) {
+        function renderTrend(elId, curr, start, isHigherBetter, prefix = '') {
             const el = $(elId);
             if (!el) return;
             if (!hasVal(curr) || !hasVal(start) || start === 0) {
@@ -1249,8 +1261,9 @@
                 arrow = diff > 0 ? '▲' : '▼';
             }
             el.innerHTML = `
+                ${prefix ? `<span class="text-mute">${prefix}</span>` : ''}
                 <span class="font-mono font-semibold" style="color:${color}">${arrow} ${Math.abs(diff).toFixed(1)}</span>
-                <span class="text-mute ml-1">(${Math.abs(pct).toFixed(1)}%) 總變化</span>`;
+                <span class="text-mute ml-1">(${Math.abs(pct).toFixed(1)}%)</span>`;
         }
 
         function calculateProgress() {
@@ -1452,12 +1465,11 @@
             ];
 
             container.innerHTML = badges.map(b => `
-                <div class="text-center p-3 rounded-lg border ${b.unlocked
-                    ? 'border-line bg-card2'
-                    : 'border-dashed border-line opacity-45'}" title="${b.label}">
-                    <p class="num text-xl font-semibold ${b.unlocked ? 'text-brandink' : 'text-mute'}">${b.mark}</p>
-                    <p class="text-[10px] mt-1 ${b.unlocked ? 'text-ink2' : 'text-mute'}">${b.label}</p>
-                </div>`).join('');
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs ${b.unlocked
+                    ? 'border-line bg-card2 text-ink2'
+                    : 'border-dashed border-line text-mute opacity-50'}" title="${b.label}">
+                    <span class="font-mono ${b.unlocked ? 'text-brandink' : ''}">${b.unlocked ? '✓' : '○'}</span>${b.label}
+                </span>`).join('');
         }
 
         function triggerCelebration() {
@@ -1490,7 +1502,7 @@
             const data = STATE.allData; // 週比較永遠看最近 14 天，與範圍選擇無關
 
             if (data.length === 0) {
-                container.innerHTML = '<p class="text-sm text-mute col-span-full">暫無數據</p>';
+                container.innerHTML = '<p class="text-sm text-mute">暫無數據</p>';
                 return;
             }
 
@@ -1501,7 +1513,7 @@
             const lastWeek = data.filter(d => d.date > twoWeeksAgo && d.date <= weekAgo);
 
             if (thisWeek.length === 0 || lastWeek.length === 0) {
-                container.innerHTML = '<p class="text-sm text-mute col-span-full">資料不足：需要連續 14 天內有測量紀錄</p>';
+                container.innerHTML = '<p class="text-sm text-mute">資料不足：需要連續 14 天內有測量紀錄</p>';
                 return;
             }
 
@@ -1518,45 +1530,45 @@
                 { label: '內臟脂肪', unit: '',   lowerBetter: true,  dot: 'var(--c5)', get: d => d.v }
             ];
 
-            container.innerHTML = metrics.map(m => {
+            const header = `
+                <div class="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-2 pb-2 border-b border-line font-mono text-[10px] tracking-wider uppercase text-mute">
+                    <span>項目</span>
+                    <span class="text-right">上週平均</span>
+                    <span class="text-right">本週平均</span>
+                    <span class="text-right">變化</span>
+                </div>`;
+
+            const rows = metrics.map(m => {
                 const thisVal = calcAvg(thisWeek, m.get);
                 const lastVal = calcAvg(lastWeek, m.get);
+                const nameCell = `
+                    <span class="text-sm text-ink2 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full shrink-0" style="background:${m.dot}"></span>${m.label}
+                    </span>`;
                 if (!hasVal(thisVal) || !hasVal(lastVal)) {
                     return `
-                        <div class="sheet-inset p-4">
-                            <p class="text-xs font-medium text-ink2 mb-2 flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full" style="background:${m.dot}"></span>${m.label}
-                            </p>
-                            <p class="text-xs text-mute">數據不足</p>
+                        <div class="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-2 items-baseline py-3 border-b border-dashed border-line last:border-0">
+                            ${nameCell}
+                            <span class="text-xs text-mute text-right col-span-3">數據不足</span>
                         </div>`;
                 }
                 const diff = thisVal - lastVal; // 正 = 本週較高
-                let arrow = '—', color = 'var(--mute)', text = '持平';
+                let arrow = '—', color = 'var(--mute)';
                 if (Math.abs(diff) > 0.05) {
                     const isGood = m.lowerBetter ? diff < 0 : diff > 0;
                     arrow = diff < 0 ? '▼' : '▲';
                     color = isGood ? 'var(--good)' : 'var(--bad)';
-                    text = diff < 0 ? '下降' : '上升';
                 }
                 return `
-                    <div class="sheet-inset p-4">
-                        <p class="text-xs font-medium text-ink2 mb-3 flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full" style="background:${m.dot}"></span>${m.label}
-                        </p>
-                        <div class="flex justify-between items-baseline mb-1">
-                            <span class="text-[11px] text-mute">本週</span>
-                            <span class="num text-lg font-semibold text-ink">${thisVal.toFixed(1)}<span class="text-[10px] text-mute font-normal">${m.unit}</span></span>
-                        </div>
-                        <div class="flex justify-between items-baseline pb-2.5 border-b border-dashed border-line">
-                            <span class="text-[11px] text-mute">上週</span>
-                            <span class="font-mono text-sm text-ink2">${lastVal.toFixed(1)}${m.unit}</span>
-                        </div>
-                        <div class="flex justify-between items-center pt-2.5">
-                            <span class="text-[11px]" style="color:${color}">${text}</span>
-                            <span class="font-mono text-sm font-semibold" style="color:${color}">${arrow} ${Math.abs(diff).toFixed(1)}${m.unit}</span>
-                        </div>
+                    <div class="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-2 items-baseline py-3 border-b border-dashed border-line last:border-0">
+                        ${nameCell}
+                        <span class="font-mono text-sm text-mute text-right">${lastVal.toFixed(1)}${m.unit}</span>
+                        <span class="num text-base font-semibold text-ink text-right">${thisVal.toFixed(1)}<span class="text-[10px] text-mute font-normal">${m.unit}</span></span>
+                        <span class="font-mono text-sm font-semibold text-right" style="color:${color}">${arrow} ${Math.abs(diff).toFixed(1)}</span>
                     </div>`;
             }).join('');
+
+            container.innerHTML = header + rows;
         }
 
         function updateBestRecords() {
