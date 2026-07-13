@@ -308,11 +308,14 @@
             <a href="#charts-section" onclick="navTo(event,'charts-section')" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink2 hover:bg-card2 hover:text-ink transition">
                 <span class="font-mono text-xs text-mute w-6">02</span> 趨勢圖表
             </a>
+            <a href="#analysis-section" onclick="navTo(event,'analysis-section')" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink2 hover:bg-card2 hover:text-ink transition">
+                <span class="font-mono text-xs text-mute w-6">03</span> 分析與預測
+            </a>
             <a href="#report-section" onclick="navTo(event,'report-section')" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink2 hover:bg-card2 hover:text-ink transition">
-                <span class="font-mono text-xs text-mute w-6">03</span> 體態報告
+                <span class="font-mono text-xs text-mute w-6">04</span> 體態報告
             </a>
             <a href="#table-section" onclick="navTo(event,'table-section')" class="flex items-center gap-3 px-3 py-2.5 rounded-md text-sm text-ink2 hover:bg-card2 hover:text-ink transition">
-                <span class="font-mono text-xs text-mute w-6">04</span> 數據明細
+                <span class="font-mono text-xs text-mute w-6">05</span> 數據明細
             </a>
 
             <p class="kicker mt-6 mb-3 px-2">操作</p>
@@ -485,9 +488,74 @@
             </div>
         </section>
 
-        <!-- ── 03 · 體態報告 ─────────────────────────────── -->
+        <!-- ── 03 · 分析與預測 ────────────────────────────── -->
+        <section id="analysis-section" class="mb-12 rise" style="animation-delay:.16s">
+            <p class="kicker mb-5">03 · 分析與預測</p>
+            <div id="card-analysis" class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+                <!-- 減重速率 -->
+                <div class="sheet p-6 md:p-7">
+                    <div class="flex items-start justify-between gap-3 mb-5">
+                        <div>
+                            <h3 class="font-display font-semibold text-xl">減重速率</h3>
+                            <p class="text-xs text-mute mt-1" id="ana-fit">依近期數據線性回歸</p>
+                        </div>
+                        <span class="font-mono text-[11px] px-2.5 py-1 rounded-full border border-line text-mute whitespace-nowrap" id="ana-phase">分析中</span>
+                    </div>
+                    <p class="flex items-baseline gap-2">
+                        <span class="num text-5xl font-semibold text-ink" id="ana-rate">–</span>
+                        <span class="text-sm text-mute">kg／週</span>
+                    </p>
+                    <p class="text-xs text-ink2 mt-4 leading-relaxed" id="ana-rate-note">資料累積中，需要至少 7 筆體重紀錄才能進行趨勢分析。</p>
+                    <div class="mt-5 pt-4 border-t border-dashed border-line grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-[11px] text-mute mb-1">30 天後預測</p>
+                            <p class="num text-base font-semibold text-ink" id="ana-w30">–</p>
+                        </div>
+                        <div>
+                            <p class="text-[11px] text-mute mb-1">預測誤差（95%）</p>
+                            <p class="num text-base font-semibold text-ink" id="ana-sigma">–</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 達標預測 -->
+                <div class="sheet p-6 md:p-7">
+                    <h3 class="font-display font-semibold text-xl mb-1">達標預測</h3>
+                    <p class="text-xs text-mute mb-5">以目前趨勢線性外推</p>
+                    <div class="sheet-inset p-4 mb-5 flex items-center justify-between">
+                        <span class="text-xs text-ink2">預計達標日</span>
+                        <span class="text-right">
+                            <span class="num text-xl font-semibold text-brandink" id="ana-goal-date">–</span>
+                            <span class="block text-[11px] text-mute mt-0.5" id="ana-goal-days"></span>
+                        </span>
+                    </div>
+                    <p class="font-mono text-[10px] tracking-wider uppercase text-mute pb-2 border-b border-line">里程碑預估</p>
+                    <div id="ana-milestones"><p class="text-xs text-mute py-3">資料累積中</p></div>
+                </div>
+
+                <!-- 體組成變化 -->
+                <div class="sheet p-6 md:p-7">
+                    <h3 class="font-display font-semibold text-xl mb-1">體組成變化</h3>
+                    <p class="text-xs text-mute mb-5">起始至今 · 依體重 × 體脂率估算</p>
+                    <div class="ledger-row py-3.5 flex justify-between items-baseline">
+                        <span class="text-xs text-ink2">脂肪量</span>
+                        <span class="text-right text-sm" id="ana-fatmass"><span class="text-mute">–</span></span>
+                    </div>
+                    <div class="ledger-row py-3.5 flex justify-between items-baseline">
+                        <span class="text-xs text-ink2">除脂體重</span>
+                        <span class="text-right text-sm" id="ana-leanmass"><span class="text-mute">–</span></span>
+                    </div>
+                    <div class="mt-5 sheet-inset p-4">
+                        <p class="text-xs leading-relaxed text-ink2" id="ana-comp-verdict">資料累積中，需要起始與最新的體脂率紀錄。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── 04 · 體態報告 ─────────────────────────────── -->
         <section id="report-section" class="mb-12 rise" style="animation-delay:.18s">
-            <p class="kicker mb-5">03 · 體態報告</p>
+            <p class="kicker mb-5">04 · 體態報告</p>
 
             <div class="grid grid-cols-1 lg:grid-cols-5 gap-5 mb-5">
                 <!-- 檢驗摘要 -->
@@ -607,9 +675,9 @@
             </div>
         </section>
 
-        <!-- ── 04 · 數據明細 ─────────────────────────────── -->
+        <!-- ── 05 · 數據明細 ─────────────────────────────── -->
         <section id="table-section" class="mb-10 rise" style="animation-delay:.22s">
-            <p class="kicker mb-5">04 · 數據明細</p>
+            <p class="kicker mb-5">05 · 數據明細</p>
             <div id="card-table" class="sheet overflow-hidden">
                 <div class="p-5 md:p-6 border-b border-line flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                     <h3 class="font-display font-semibold text-xl">測量紀錄</h3>
@@ -950,6 +1018,7 @@
             if (STATE.allData.length > 0) {
                 renderKPIs();
                 updateBMIVisualization();
+                updateAnalysis(); // 目標/身高變更會影響預測與里程碑
                 renderCharts();
             }
             closeModal('settings-modal');
@@ -1162,6 +1231,7 @@
                     STATE.allData[i].w_ma7 = count > 0 ? sum / count : null;
                 }
 
+                updateAnalysis(); // 先算出預測線，renderCharts 會用到
                 filterDate(STATE.filterRange);
                 renderKPIs();
                 calculateProgress();
@@ -1324,6 +1394,185 @@
                 else                       setText('estimated-days', `約 ${Math.ceil(weeksNeeded / 4.3)} 個月`);
             } else {
                 setText('estimated-days', '資料累積中');
+            }
+        }
+
+        // ================================================
+        // 9.5 數據分析與預測（線性回歸）
+        // ================================================
+        function linearRegression(points) {
+            const n = points.length;
+            if (n < 2) return null;
+            const mx = points.reduce((s, p) => s + p.x, 0) / n;
+            const my = points.reduce((s, p) => s + p.y, 0) / n;
+            let sxx = 0, sxy = 0, ssTot = 0;
+            points.forEach(p => {
+                sxx += (p.x - mx) ** 2;
+                sxy += (p.x - mx) * (p.y - my);
+                ssTot += (p.y - my) ** 2;
+            });
+            if (sxx === 0) return null;
+            const slope = sxy / sxx;
+            const intercept = my - slope * mx;
+            let ssRes = 0;
+            points.forEach(p => { const e = p.y - (intercept + slope * p.x); ssRes += e * e; });
+            return {
+                slope, intercept,
+                r2: ssTot > 0 ? Math.max(0, 1 - ssRes / ssTot) : 0,
+                sigma: n > 2 ? Math.sqrt(ssRes / (n - 2)) : 0,
+                n
+            };
+        }
+
+        const dayNum = (dateStr) => Math.round(new Date(dateStr + 'T00:00:00').getTime() / 86400000);
+
+        function updateAnalysis() {
+            STATE.forecast = null;
+            const series = STATE.allData
+                .map(d => ({ date: d.date, w: anyWeight(d) }))
+                .filter(p => p.w !== null);
+            renderCompositionAnalysis();
+            if (series.length < 7) return;
+
+            // 回歸視窗：近 28 天；不足 7 筆則改用最後 14 筆
+            const lastDate = series[series.length - 1].date;
+            let win = series.filter(p => p.date > shiftDateStr(lastDate, -28));
+            if (win.length < 7) win = series.slice(-14);
+            if (win.length < 7) return;
+            const windowDays = dayNum(lastDate) - dayNum(win[0].date) + 1;
+
+            const reg = linearRegression(win.map(p => ({ x: dayNum(p.date), y: p.w })));
+            if (!reg) return;
+
+            const lastX = dayNum(lastDate);
+            const yNow = reg.intercept + reg.slope * lastX;  // 回歸平滑後的目前體重
+            const ratePerWeek = reg.slope * 7;               // 負值 = 下降
+            const goal = STATE.userSettings.goal;
+
+            // ── 減重速率卡 ──
+            setText('ana-rate', (ratePerWeek <= 0 ? '−' : '+') + Math.abs(ratePerWeek).toFixed(2));
+            setText('ana-fit', `近 ${windowDays} 天 · ${reg.n} 筆 · R² ${reg.r2.toFixed(2)}`);
+
+            let phase, phaseColor, note;
+            if (ratePerWeek <= -0.75) {
+                phase = '快速下降'; phaseColor = 'var(--warn)';
+                note = '下降速度偏快（一般建議每週 0.5–1.0 kg）。GLP-1 治療期間請確保足夠蛋白質攝取並搭配阻力訓練，以減少肌肉流失。';
+            } else if (ratePerWeek <= -0.15) {
+                phase = '穩定下降'; phaseColor = 'var(--good)';
+                note = '目前處於健康且可持續的減重速率區間（一般建議每週 0.5–1.0 kg），維持現在的節奏即可。';
+            } else if (ratePerWeek < 0.15) {
+                phase = '平台期'; phaseColor = 'var(--mute)';
+                note = '近期體重變化趨於平緩。平台期是常見的生理現象，可檢視飲食紀錄、睡眠與活動量，或與醫師討論治療計畫。';
+            } else {
+                phase = '體重回升'; phaseColor = 'var(--bad)';
+                note = '近期體重呈回升趨勢，建議回顧飲食與用藥規律，必要時與醫師討論。';
+            }
+            const phaseEl = $('ana-phase');
+            if (phaseEl) {
+                phaseEl.innerText = phase;
+                phaseEl.style.color = phaseColor;
+                phaseEl.style.borderColor = phaseColor;
+            }
+            setText('ana-rate-note', note);
+
+            const w30raw = reg.intercept + reg.slope * (lastX + 30);
+            const w30 = Math.max(w30raw, Math.min(goal, yNow));
+            setText('ana-w30', `${w30.toFixed(1)} kg${w30raw < goal && yNow > goal ? '（達標）' : ''}`);
+            setText('ana-sigma', `± ${(1.96 * reg.sigma).toFixed(1)} kg`);
+
+            // ── 達標預測卡 ──
+            const goalDateEl = $('ana-goal-date');
+            const goalDaysEl = $('ana-goal-days');
+            const goalReached = yNow <= goal;
+            if (goalReached) {
+                if (goalDateEl) goalDateEl.innerText = '已達標';
+                if (goalDaysEl) goalDaysEl.innerText = '';
+            } else if (reg.slope < -0.005) {
+                const days = Math.ceil((goal - yNow) / reg.slope);
+                if (days > 730) {
+                    if (goalDateEl) goalDateEl.innerText = '超過 2 年';
+                    if (goalDaysEl) goalDaysEl.innerText = '以目前速率估算';
+                } else {
+                    if (goalDateEl) goalDateEl.innerText = shiftDateStr(lastDate, days).replace(/-/g, '/');
+                    if (goalDaysEl) goalDaysEl.innerText = `約 ${days} 天後`;
+                }
+            } else {
+                if (goalDateEl) goalDateEl.innerText = '—';
+                if (goalDaysEl) goalDaysEl.innerText = '平台期間暫無法外推';
+            }
+
+            // 里程碑：整數關卡 + BMI 分界 + 目標
+            const msEl = $('ana-milestones');
+            if (msEl) {
+                const rows = [];
+                if (reg.slope < -0.005 && !goalReached) {
+                    const h = STATE.userSettings.height / 100;
+                    const targets = [];
+                    for (let m = Math.floor(yNow - 0.001); m > goal && targets.length < 3; m--) {
+                        targets.push({ label: `${m} kg`, w: m });
+                    }
+                    [[27, '脫離肥胖'], [24, '進入標準']].forEach(([b, tag]) => {
+                        const wB = b * h * h;
+                        if (wB < yNow - 0.05 && wB >= goal - 2) targets.push({ label: `BMI ${b}（${tag}）`, w: wB });
+                    });
+                    targets.push({ label: `目標 ${goal} kg`, w: goal });
+                    targets.sort((a, b) => b.w - a.w);
+                    targets.slice(0, 5).forEach(t => {
+                        const days = Math.ceil((t.w - yNow) / reg.slope);
+                        if (days <= 0 || days > 730) return;
+                        rows.push(`
+                            <div class="flex justify-between items-baseline py-2.5 border-b border-dashed border-line last:border-0">
+                                <span class="text-xs text-ink2">${t.label}</span>
+                                <span class="text-right">
+                                    <span class="font-mono text-sm font-semibold text-ink">${shiftDateStr(lastDate, days).slice(5).replace('-', '/')}</span>
+                                    <span class="font-mono text-[11px] text-mute ml-2">${days} 天</span>
+                                </span>
+                            </div>`);
+                    });
+                }
+                msEl.innerHTML = rows.length ? rows.join('') : '<p class="text-xs text-mute py-3">目前趨勢下暫無可預估的里程碑</p>';
+            }
+
+            // ── 預測線（30 天，供體重趨勢圖使用）──
+            const fDates = [], fVals = [];
+            for (let i = 1; i <= 30; i++) {
+                fDates.push(shiftDateStr(lastDate, i));
+                fVals.push(reg.intercept + reg.slope * (lastX + i));
+            }
+            STATE.forecast = { dates: fDates, values: fVals, anchorY: yNow };
+        }
+
+        // 體組成變化：脂肪量 vs 除脂體重（起始 → 現在）
+        function renderCompositionAnalysis() {
+            const both = STATE.allData.filter(d => anyWeight(d) !== null && hasVal(d.f_am));
+            if (both.length < 2) return; // 保留「資料累積中」預設文案
+            const first = both[0], last = both[both.length - 1];
+            const w0 = anyWeight(first), w1 = anyWeight(last);
+            const fat0 = w0 * first.f_am / 100, fat1 = w1 * last.f_am / 100;
+            const lean0 = w0 - fat0, lean1 = w1 - fat1;
+            const dFat = fat1 - fat0, dLean = lean1 - lean0;
+
+            const delta = (d, goodWhenDown) => {
+                const good = goodWhenDown ? d <= 0 : d >= 0;
+                return `<span class="font-mono font-semibold ml-2" style="color:${good ? 'var(--good)' : 'var(--bad)'}">${d <= 0 ? '▼' : '▲'} ${Math.abs(d).toFixed(1)}</span>`;
+            };
+            const fatEl = $('ana-fatmass');
+            const leanEl = $('ana-leanmass');
+            if (fatEl) fatEl.innerHTML = `<span class="font-mono text-xs text-mute">${fat0.toFixed(1)} →</span> <span class="num text-base font-semibold text-ink ml-1">${fat1.toFixed(1)} kg</span>${delta(dFat, true)}`;
+            if (leanEl) leanEl.innerHTML = `<span class="font-mono text-xs text-mute">${lean0.toFixed(1)} →</span> <span class="num text-base font-semibold text-ink ml-1">${lean1.toFixed(1)} kg</span>${delta(dLean, false)}`;
+
+            const verdictEl = $('ana-comp-verdict');
+            if (!verdictEl) return;
+            const totalLoss = w0 - w1;
+            if (totalLoss > 0.5) {
+                const fatShare = Math.max(0, Math.min(150, Math.round((-dFat / totalLoss) * 100)));
+                if (dLean < 0 && -dLean > totalLoss * 0.3) {
+                    verdictEl.innerHTML = `累計減重 ${totalLoss.toFixed(1)} kg，其中約 <b>${fatShare}%</b> 來自脂肪。除脂體重流失偏多（${Math.abs(dLean).toFixed(1)} kg），建議提高蛋白質攝取並加入阻力訓練。`;
+                } else {
+                    verdictEl.innerHTML = `累計減重 ${totalLoss.toFixed(1)} kg，其中約 <b>${fatShare}%</b> 來自脂肪，肌肉保留情況良好，減重品質理想。`;
+                }
+            } else {
+                verdictEl.innerText = '體重變化尚小，體組成分析將隨數據累積更加準確。';
             }
         }
 
@@ -1727,34 +1976,47 @@
             const labels = data.map(d => d.date);
             const t = chartTheme();
 
-            // 1) 體重主圖：AM / PM 散點 + 7 日均線 + 目標參考線
-            drawChart('weightChart', {
-                labels,
-                datasets: [
-                    {
-                        type: 'line', label: '7日均線', data: data.map(d => d.w_ma7),
-                        borderColor: t.ink, borderWidth: 2, pointRadius: 0,
-                        tension: 0.35, spanGaps: true
-                    },
-                    {
-                        type: 'line', label: '早上體重', showLine: false,
-                        data: data.map(d => d.w_am),
-                        borderColor: t.c1, backgroundColor: t.c1,
-                        pointRadius: 3.5, pointHoverRadius: 6
-                    },
-                    {
-                        type: 'line', label: '晚上體重', showLine: false,
-                        data: data.map(d => d.w_pm),
-                        borderColor: t.c2, backgroundColor: t.c2,
-                        pointRadius: 3.5, pointHoverRadius: 6, hidden: true
-                    },
-                    {
-                        type: 'line', label: '目標',
-                        data: Array(data.length).fill(STATE.userSettings.goal),
-                        borderColor: t.mute, borderWidth: 1.5, pointRadius: 0, borderDash: [6, 4]
-                    }
-                ]
-            }, baseOptions(t, { legend: true, zoom: true }));
+            // 預測線：把 x 軸標籤往未來延伸，歷史資料集以 null 補齊
+            const fc = STATE.forecast;
+            const fcPad = fc ? Array(fc.dates.length).fill(null) : [];
+            const extLabels = fc ? labels.concat(fc.dates) : labels;
+
+            // 1) 體重主圖：AM / PM 散點 + 7 日均線 + 預測線 + 目標參考線
+            const weightDatasets = [
+                {
+                    type: 'line', label: '7日均線', data: data.map(d => d.w_ma7).concat(fcPad),
+                    borderColor: t.ink, borderWidth: 2, pointRadius: 0,
+                    tension: 0.35, spanGaps: true
+                },
+                {
+                    type: 'line', label: '早上體重', showLine: false,
+                    data: data.map(d => d.w_am).concat(fcPad),
+                    borderColor: t.c1, backgroundColor: t.c1,
+                    pointRadius: 3.5, pointHoverRadius: 6
+                },
+                {
+                    type: 'line', label: '晚上體重', showLine: false,
+                    data: data.map(d => d.w_pm).concat(fcPad),
+                    borderColor: t.c2, backgroundColor: t.c2,
+                    pointRadius: 3.5, pointHoverRadius: 6, hidden: true
+                }
+            ];
+            if (fc && data.length > 0) {
+                weightDatasets.push({
+                    type: 'line', label: '預測（30天）',
+                    data: Array(Math.max(0, data.length - 1)).fill(null).concat([fc.anchorY, ...fc.values]),
+                    borderColor: t.c1, borderWidth: 1.5, pointRadius: 0,
+                    borderDash: [5, 4], spanGaps: false
+                });
+            }
+            weightDatasets.push({
+                type: 'line', label: '目標',
+                data: Array(extLabels.length).fill(STATE.userSettings.goal),
+                borderColor: t.mute, borderWidth: 1.5, pointRadius: 0, borderDash: [6, 4]
+            });
+
+            drawChart('weightChart', { labels: extLabels, datasets: weightDatasets },
+                baseOptions(t, { legend: true, zoom: true }));
 
             // 2) 體脂率 + 目標體脂線
             drawChart('fatChart', {
@@ -2002,7 +2264,7 @@
                 let y = margin;
                 const surface = cssVar('--card');
 
-                const sections = [banner, $('kpi-grid'), $('card-weight-chart'), $('small-charts'), $('card-week'), $('card-table')];
+                const sections = [banner, $('kpi-grid'), $('card-weight-chart'), $('small-charts'), $('card-analysis'), $('card-week'), $('card-table')];
 
                 for (const el of sections) {
                     if (!el) continue;
