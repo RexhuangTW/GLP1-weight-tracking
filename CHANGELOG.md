@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2026-07-13
+
+### 🎨 重大更新：精緻醫療臨床風重新設計 + 全面 Bug 修復
+
+整檔重寫 `index.html`（2,864 行 → 約 2,090 行），修復 15+ 個確定的 bug，並以「精緻醫療臨床風」重新設計。**localStorage 鍵值完全相容**（`glp1_v3_data`、`glp1_v3_settings`、`localDataEntries`、`darkMode` 等），既有資料與設定不受影響。
+
+### 🐛 Bug 修復
+
+- **BMI 標籤永遠顯示「-」**：HTML `kpi-bmi-badge` 與 JS `kpi-bmi-tag` ID 不一致
+- **載入遮罩永久卡住**：快取命中路徑不呼叫 `hideLoading()`；離線時靜默更新失敗也不關閉遮罩
+- **圖表尺寸失控**：CSS 定義 `.chart-container` 但 HTML 使用 `.chart-wrapper`，容器無固定高度
+- **統計全面反轉**：`mergeLocalData`/`saveDataEntry` 以遞減排序，其餘邏輯（7 日均線、KPI、趨勢）假設遞增——只要有一筆手動紀錄，最新/最舊即顛倒。現統一為遞增排序
+- **週比較比錯週**：`slice(0,7)` 假設遞減資料，實際比的是「最舊兩週」。改為以最後測量日期切出近 7 天 vs 前 7 天
+- **PDF 中文亂碼**：jsPDF 內建字型不支援 CJK。改為所有內容（含封面橫幅）經 html2canvas 圖片化，並支援過長表格自動切片分頁
+- **PDF 失敗會刪掉設定視窗**：錯誤處理用 `querySelector('.fixed.inset-0.bg-black\\/50')` 誤中設定 Modal 並將其從 DOM 移除。改為保留遮罩參照、`finally` 中精準移除
+- **手機導覽崩潰**：`scrollToId` 引用不存在的 `#mobile-menu` 導致 TypeError
+- **本地紀錄覆蓋試算表資料**：`mergeLocalData` 的展開運算會用 null 蓋掉有效欄位。改為僅合併有值欄位
+- **時區日期偏移**：`toISOString()` 取 UTC 日期，台灣時區早上 8 點前的紀錄會歸到前一天。改用本地時區格式化
+- **0 被當缺值**：`renderTrend` 等多處 falsy 檢查；BMI 視覺化只認早上體重。統一 `hasVal()` 判斷 + `w_am || w_pm` 後援
+- **週平均計算錯誤**：以「筆數 ÷ 7」而非實際日期跨度計算
+- **死代碼清除**：Blob URL Service Worker（瀏覽器不允許、永遠註冊失敗）、`showError` 引用不存在的元素、via.placeholder.com 圖示（服務已停）、遺留 debug console.log、未使用 CSS（glass-panel/energy-card）、`無有有效數據` 錯字
+
+### 🎨 重新設計
+
+- **視覺語言**：精緻醫療臨床風——冷調底色 #F4F7FB + 純白卡片 + 臨床藍 #1D5BD6 品牌色 + 醫療青輔助色，背景帶極淡的臨床方格紙紋理；深色模式為夜間病歷藍黑 #0A1220
+- **字型系統**：IBM Plex Sans（標題/大數字）× Noto Sans TC（內文）× IBM Plex Mono（數據/表格），移除 Font Awesome
+- **圖表配色通過無障礙驗證**：淺色（白卡面）/ 深色（#101B30 卡面）兩組五色系列各自通過色盲安全（CVD ΔE）、彩度、對比檢查
+- **雙軸圖拆分**：骨骼肌＋內臟脂肪雙 Y 軸圖（誤導性比例）拆為三張單序列小圖（體脂率含目標線／骨骼肌／內臟脂肪）
+- **BMI 量尺修正**：改為線性 15–35 刻度，色帶、指針、邊界標籤（18.5/24/27）共用同一座標系
+- **主題架構**：CSS 變數 + Tailwind `darkMode:'class'`，切換主題時圖表即時重繪取色
+- **行動版**：正式的固定抽屜側欄 + 背景遮罩 + Esc 關閉；檢驗報告式卡片、健康評分環、病歷式虛線資料列
+- **體驗**：alert() 全面改為 toast 通知；載入失敗顯示可重試的錯誤面板（自動退回過期快取）；表單輸入範圍驗證
+
 ## [2.0.0] - 2025-12-09
 
 ### 🎉 重大更新：全新醫療風格 Web 應用
